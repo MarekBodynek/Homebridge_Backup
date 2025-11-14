@@ -26,11 +26,19 @@ Backup konfiguracji systemu smart home na Orange Pi.
 - **User:** mqtt
 - **Topic:** zigbee2mqtt
 
+### Pi-hole
+- **Wersja:** v6.2.2 (Core), v6.3 (Web), v6.3.3 (FTL)
+- **Panel:** http://192.168.0.133/admin
+- **Hasło:** bodino44
+- **Blokowane domeny:** 107,070
+- **Upstream DNS:** 1.1.1.1, 8.8.8.8
+
 ## Backupy
 
 ### Pełne archiwa
-- `homebridge-backup-20251114-223002.tar.gz` - Pełny backup /var/lib/homebridge
-- `zigbee2mqtt-backup-20251114-223002.tar.gz` - Pełny backup /opt/zigbee2mqtt/data
+- `homebridge-backup-20251114-232119.tar.gz` - Pełny backup /var/lib/homebridge
+- `zigbee2mqtt-backup-20251114-232119.tar.gz` - Pełny backup /opt/zigbee2mqtt/data
+- `pihole-backup-20251114-232119.tar.gz` - Pełny backup /etc/pihole
 
 ### Pliki konfiguracyjne
 - `homebridge-config.json` - Konfiguracja Homebridge
@@ -44,7 +52,8 @@ Backup konfiguracji systemu smart home na Orange Pi.
 - Upgrade npm 10.9.4 → 11.6.2
 - Rebuild Homebridge dla Node.js v22
 - Naprawa Mosquitto MQTT (wykomentowano pid_file)
-- Utworzenie pełnych backupów
+- Instalacja Pi-hole v6.2.2 (blokowanie reklam sieciowych)
+- Utworzenie pełnych backupów (Homebridge, Zigbee2MQTT, Pi-hole)
 
 ## Urządzenia Zigbee
 
@@ -73,8 +82,16 @@ sudo systemctl start homebridge
 ```bash
 sudo systemctl stop zigbee2mqtt
 sudo rm -rf /opt/zigbee2mqtt/data
-sudo tar -xzf zigbee2mqtt-backup-20251114-223002.tar.gz -C /opt/zigbee2mqtt/
+sudo tar -xzf zigbee2mqtt-backup-20251114-232119.tar.gz -C /opt/zigbee2mqtt/
 sudo systemctl start zigbee2mqtt
+```
+
+### Pi-hole
+```bash
+sudo systemctl stop pihole-FTL
+sudo rm -rf /etc/pihole
+sudo tar -xzf pihole-backup-20251114-232119.tar.gz -C /etc/
+sudo systemctl start pihole-FTL
 ```
 
 ## Notatki
