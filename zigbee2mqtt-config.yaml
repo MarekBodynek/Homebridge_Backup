@@ -1,0 +1,22 @@
+frontend:
+  port: 8080
+mqtt:
+  base_topic: zigbee2mqtt
+  server: mqtt://localhost:1883
+  user: YOUR_MQTT_USER
+  password: YOUR_MQTT_PASSWORD
+serial:
+  port: /dev/ttyUSB0
+advanced:
+  log_level: info
+  network_key: GENERATE  # Will be auto-generated on first start
+  homeassistant_legacy_entity_attributes: false
+  legacy_api: false
+  legacy_availability_payload: false
+device_options:
+  legacy: false
+devices:
+  # Your Zigbee devices will appear here after pairing
+  # Example:
+  # '0xa4c138779228dfc3':
+  #   friendly_name: Temperature sensor living room
