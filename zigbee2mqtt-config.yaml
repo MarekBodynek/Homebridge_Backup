@@ -1,22 +1,61 @@
 frontend:
+  enabled: true
   port: 8080
 mqtt:
   base_topic: zigbee2mqtt
   server: mqtt://localhost:1883
-  user: YOUR_MQTT_USER
-  password: YOUR_MQTT_PASSWORD
+  user: mqtt
+  password: mqtt
 serial:
   port: /dev/ttyUSB0
 advanced:
-  log_level: info
-  network_key: GENERATE  # Will be auto-generated on first start
-  homeassistant_legacy_entity_attributes: false
-  legacy_api: false
-  legacy_availability_payload: false
-device_options:
-  legacy: false
+  log_level: debug
+  network_key:
+    - 219
+    - 194
+    - 126
+    - 138
+    - 138
+    - 160
+    - 109
+    - 93
+    - 7
+    - 251
+    - 120
+    - 73
+    - 211
+    - 234
+    - 115
+    - 179
+device_options: {}
 devices:
-  # Your Zigbee devices will appear here after pairing
-  # Example:
-  # '0xa4c138779228dfc3':
-  #   friendly_name: Temperature sensor living room
+  '0xa4c138779228dfc3':
+    friendly_name: Czujnik temperatury jadalnia
+  '0x84fd27fffe0e5915':
+    friendly_name: Regulator kaloryfer jadalnia
+  '0xa4c138f0e16cf8a0':
+    friendly_name: Czujnik temperatury łazienka góra
+  '0x84fd27fffe379152':
+    friendly_name: Regulator kaloryfer sypialnia
+  '0x70ac08fffe261e95':
+    friendly_name: '0x70ac08fffe261e95'
+  '0xa4c138f9b45b07ae':
+    friendly_name: Czujnik temperatury hall
+  '0xa4c1380d76717de8':
+    friendly_name: Czujnik temperatury garaż
+  '0x0c4314fffe61a2ba':
+    friendly_name: Regulator kaloryfer biuro
+  '0x70ac08fffe26553f':
+    friendly_name: '0x70ac08fffe26553f'
+  '0x00158d000a82332f':
+    friendly_name: Czujnik ruchu łazienka dół
+  '0x0c4314fffe63a9b3':
+    friendly_name: Regulator kaloryfer pokój Patryka
+  '0x00158d000ad928d4':
+    friendly_name: Włącznik brama garażowa
+version: 4
+groups:
+  '1':
+    friendly_name: Łazienka Dół
+homeassistant:
+  enabled: true
