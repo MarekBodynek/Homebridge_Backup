@@ -200,18 +200,33 @@ Każdy regulator powinien pokazywać:
 Skrypt `~/weekly-maintenance.sh` uruchamia się automatycznie **co niedzielę o 3:00**:
 
 1. **Backup** → `/home/orangepi/backups/`
-   - Homebridge, Zigbee2MQTT, Pi-hole
+   - Homebridge, Zigbee2MQTT, Pi-hole, Tailscale
    - URL-e list Pi-hole (pihole-adlists-*.txt)
    - Stare backupy (>30 dni) usuwane automatycznie
 
 2. **Aktualizacja**
    - apt upgrade
    - npm, pnpm
+   - Tailscale
 
 3. **Odświeżenie Pi-hole**
    - `pihole -g` po aktualizacji systemu
 
+4. **Sprawdzenie aktualizacji Zigbee**
+   - Firmware urządzeń OTA
+
+5. **Sprawdzenie aktualizacji Homebridge**
+   - Pluginy npm
+
 **Logi:** `/var/log/weekly-maintenance.log`
+
+### Codzienna konserwacja pamięci
+Skrypt `~/memory-cleanup.sh` uruchamia się automatycznie **codziennie o 4:00**:
+- Czyści cache systemowy (`drop_caches`)
+- Restartuje Pi-hole jeśli używa >150 MB RAM
+- Orange Pi ma tylko 964 MB RAM
+
+**Logi:** `/var/log/memory-cleanup.log`
 
 ### Aktualizacja list Pi-hole
 Gravity update uruchamia się automatycznie **co 6 godzin** (0:00, 6:00, 12:00, 18:00):
