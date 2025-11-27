@@ -30,7 +30,7 @@ Backup konfiguracji systemu smart home na Orange Pi.
 - **Wersja:** v6.2.2 (Core), v6.3 (Web), v6.3.3 (FTL)
 - **Panel:** http://192.168.0.133/admin
 - **Hasło:** bodino44
-- **Blokowane domeny:** 785,686 (Firebog + polskie listy)
+- **Blokowane domeny:** 789,404 (Firebog + polskie listy)
 - **Upstream DNS:** Unbound (127.0.0.1#5335)
 - **Automatyczna aktualizacja list:** co 6 godzin
 
@@ -52,6 +52,19 @@ Backup konfiguracji systemu smart home na Orange Pi.
 - `zigbee2mqtt-config.yaml` - Konfiguracja Zigbee2MQTT
 
 ## Historia zmian
+
+### 2025-11-27
+- Zamiana WireGuard na Tailscale (łatwiejsza konfiguracja, wsparcie Apple TV)
+- Orange Pi jako subnet router (192.168.0.0/24)
+- Dostęp do całej sieci domowej przez Tailscale
+- Streaming filmów z MacMini na Apple TV przez Infuse
+
+### 2025-11-26
+- Instalacja WireGuard VPN (wireguard-go dla kernel 4.9) - zastąpione przez Tailscale
+- Konfiguracja Cloudflare DDNS (vpn.bodino.us.kg)
+- Automatyczna aktualizacja IP co 5 minut
+- Port forwarding 51820 UDP na routerze TP-Link
+- Klient VPN skonfigurowany na MacBooku
 
 ### 2025-11-25
 - Naprawa przycisku Zigbee "Włącznik brama garażowa" (rekonfiguracja urządzenia)
@@ -197,7 +210,35 @@ Gravity update uruchamia się automatycznie **co 6 godzin** (0:00, 6:00, 12:00, 
 
 **Logi:** `/var/log/pihole-gravity-update.log`
 
-## Dostęp zdalny (Cloudflare Tunnel)
+## Dostęp zdalny
+
+### Tailscale VPN (zalecane)
+- **Orange Pi IP:** 100.73.24.70
+- **Subnet routing:** 192.168.0.0/24 (cała sieć domowa)
+- **DNS przez VPN:** Pi-hole (192.168.0.133)
+
+**Instalacja:**
+- macOS: App Store lub `brew install --cask tailscale`
+- Apple TV: App Store → Tailscale
+- Zaloguj się na to samo konto Tailscale
+
+**Przez Tailscale masz dostęp do:**
+- Cała sieć domowa (192.168.0.x) przez subnet routing
+- MacMini (192.168.0.106) - dysk z filmami
+- Pi-hole, Homebridge, Zigbee2MQTT
+- Udostępnione dyski, drukarki, inne urządzenia
+
+**Panel administracyjny:** https://login.tailscale.com/admin
+
+### Streaming na Apple TV (Infuse)
+1. Zainstaluj **Tailscale** na Apple TV (App Store)
+2. Zaloguj się na to samo konto
+3. W **Infuse** dodaj źródło SMB:
+   - Adres: `192.168.0.106`
+   - Ścieżka: `Seagate25_5T/!!!!Filmy NB`
+   - Użytkownik/hasło: dane do MacMini
+
+### Cloudflare Tunnel (alternatywa)
 
 | Serwis | URL |
 |--------|-----|
@@ -238,4 +279,4 @@ Gravity update uruchamia się automatycznie **co 6 godzin** (0:00, 6:00, 12:00, 
 - Wszystkie serwisy działają poprawnie
 - Frontend Zigbee2MQTT bez zabezpieczenia hasłem (próba dodania auth zakończyła się błędem YAML)
 - **HomeKit jest głównym źródłem kontroli temperatury** - harmonogramy Zigbee wyłączone
-- **Pi-hole blokuje 785,686 domen** - Firebog + polskie listy, aktualizowane co 6h
+- **Pi-hole blokuje 789,404 domen** - Firebog + polskie listy, aktualizowane co 6h
