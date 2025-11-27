@@ -46,6 +46,7 @@ Backup konfiguracji systemu smart home na Orange Pi.
 - `homebridge-backup-20251127-011658.tar.gz` - Pełny backup /var/lib/homebridge
 - `zigbee2mqtt-backup-20251127-011658.tar.gz` - Pełny backup /opt/zigbee2mqtt/data
 - `pihole-backup-20251127-011658.tar.gz` - Pełny backup /etc/pihole
+- `tailscale-backup-20251127-012915.tar.gz` - Pełny backup /var/lib/tailscale
 
 ### Pliki konfiguracyjne
 - `homebridge-config.json` - Konfiguracja Homebridge
@@ -147,8 +148,16 @@ sudo systemctl start zigbee2mqtt
 ```bash
 sudo systemctl stop pihole-FTL
 sudo rm -rf /etc/pihole
-sudo tar -xzf pihole-backup-20251121-205023.tar.gz -C /etc/
+sudo tar -xzf pihole-backup-20251127-011658.tar.gz -C /etc/
 sudo systemctl start pihole-FTL
+```
+
+### Tailscale
+```bash
+sudo systemctl stop tailscaled
+sudo rm -rf /var/lib/tailscale
+sudo tar -xzf tailscale-backup-20251127-012915.tar.gz -C /var/lib/
+sudo systemctl start tailscaled
 ```
 
 ## Zarządzanie harmonogramami regulatorów
