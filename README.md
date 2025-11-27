@@ -43,9 +43,9 @@ Backup konfiguracji systemu smart home na Orange Pi.
 ## Backupy
 
 ### Pełne archiwa
-- `homebridge-backup-20251121-205023.tar.gz` - Pełny backup /var/lib/homebridge
-- `zigbee2mqtt-backup-20251121-205023.tar.gz` - Pełny backup /opt/zigbee2mqtt/data
-- `pihole-backup-20251121-205023.tar.gz` - Pełny backup /etc/pihole
+- `homebridge-backup-20251127-011658.tar.gz` - Pełny backup /var/lib/homebridge
+- `zigbee2mqtt-backup-20251127-011658.tar.gz` - Pełny backup /opt/zigbee2mqtt/data
+- `pihole-backup-20251127-011658.tar.gz` - Pełny backup /etc/pihole
 
 ### Pliki konfiguracyjne
 - `homebridge-config.json` - Konfiguracja Homebridge
