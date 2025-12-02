@@ -4,7 +4,7 @@ Backup konfiguracji systemu smart home na Orange Pi.
 
 ## System
 
-- **Debian:** 12 (Bookworm)
+- **Debian:** 13 (Trixie)
 - **Node.js:** v22.21.0
 - **npm:** 11.6.2
 
@@ -27,7 +27,7 @@ Backup konfiguracji systemu smart home na Orange Pi.
 - **Topic:** zigbee2mqtt
 
 ### Pi-hole
-- **Wersja:** v6.2.2 (Core), v6.3 (Web), v6.3.3 (FTL)
+- **Wersja:** v6.3 (Core), v6.4 (Web), v6.4.1 (FTL)
 - **Panel:** http://192.168.0.133/admin
 - **Hasło:** bodino44
 - **Blokowane domeny:** 789,404 (Firebog + polskie listy)
@@ -43,9 +43,9 @@ Backup konfiguracji systemu smart home na Orange Pi.
 ## Backupy
 
 ### Pełne archiwa
-- `homebridge-backup-20251127-011658.tar.gz` - Pełny backup /var/lib/homebridge
-- `zigbee2mqtt-backup-20251127-011658.tar.gz` - Pełny backup /opt/zigbee2mqtt/data
-- `tailscale-backup-20251127-012915.tar.gz` - Pełny backup /var/lib/tailscale
+- `homebridge-backup-20251202-141551.tar.gz` - Pełny backup /var/lib/homebridge
+- `zigbee2mqtt-backup-20251202-141551.tar.gz` - Pełny backup /opt/zigbee2mqtt/data
+- `tailscale-backup-20251202-141551.tar.gz` - Pełny backup /var/lib/tailscale
 
 **Uwaga:** Backup Pi-hole (~90 MB) tylko na Orange Pi (`~/backups/`) - za duży dla GitHub.
 
@@ -54,6 +54,14 @@ Backup konfiguracji systemu smart home na Orange Pi.
 - `zigbee2mqtt-config.yaml` - Konfiguracja Zigbee2MQTT
 
 ## Historia zmian
+
+### 2025-12-02
+- Upgrade Debian 12 (Bookworm) → 13 (Trixie)
+- Upgrade Pi-hole v6.2.2 → v6.3 (Core), v6.4 (Web), v6.4.1 (FTL)
+- Naprawiono uprawnienia /etc/pihole/versions
+- Naprawiono zmienną środowiskową TERM dla Pi-hole
+- Naprawiono konfigurację dpkg (base-files)
+- Aktualizacja backupów (Homebridge, Zigbee2MQTT, Tailscale)
 
 ### 2025-11-27
 - Zamiana WireGuard na Tailscale (łatwiejsza konfiguracja, wsparcie Apple TV)
