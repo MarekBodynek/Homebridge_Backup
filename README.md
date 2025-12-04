@@ -278,7 +278,20 @@ Gravity update uruchamia się automatycznie **co 6 godzin** (0:00, 6:00, 12:00, 
 | **Zigbee2MQTT** | https://zigbee.bodino.us.kg |
 | **Homebridge** | https://homebridge.bodino.us.kg |
 | **Pi-hole** | https://pihole.bodino.us.kg |
-| **SSH** | `ssh -o ProxyCommand="cloudflared access ssh --hostname %h" orangepi@orangepi-ssh.bodino.us.kg` |
+| **SSH Orange Pi** | `ssh -o ProxyCommand="cloudflared access ssh --hostname %h" orangepi@orangepi-ssh.bodino.us.kg` |
+
+### SSH do Mac Mini (przez Orange Pi)
+
+Mac Mini nie ma bezpośredniego tunelu - dostęp przez Orange Pi:
+
+```bash
+# Z Orange Pi (po zalogowaniu przez Cloudflare Tunnel):
+ssh marekbodynek@192.168.0.106
+```
+
+- **IP:** 192.168.0.106
+- **Użytkownik:** marekbodynek
+- **Hasło:** Keram1qazXSW@3edcV
 
 **Healthcheck:** Skrypt `~/tunnel-healthcheck.sh` sprawdza tunele **co 5 minut** i automatycznie restartuje cloudflared jeśli nie działa.
 
