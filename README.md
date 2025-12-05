@@ -4,9 +4,16 @@ Backup konfiguracji systemu smart home na Orange Pi.
 
 ## System
 
-- **Debian:** 13 (Trixie)
-- **Node.js:** v22.21.0
-- **npm:** 11.6.2
+- **OS:** Armbian 25.5.1 (Debian 12 Bookworm)
+- **Kernel:** 6.12.23-current-sunxi64
+- **Hardware:** Orange Pi Zero2
+- **IP:** 192.168.0.133
+
+### Dane logowania
+- **root:** `Orange1234!`
+- **użytkownik:** `orange` / hasło: `orange`
+
+**UWAGA:** System został zresetowany 2025-12-05. Serwisy (Homebridge, Pi-hole, Zigbee2MQTT) wymagają ponownej instalacji z backupów.
 
 ## Komponenty
 
@@ -54,6 +61,18 @@ Backup konfiguracji systemu smart home na Orange Pi.
 - `zigbee2mqtt-config.yaml` - Konfiguracja Zigbee2MQTT
 
 ## Historia zmian
+
+### 2025-12-05
+- Pełna reinstalacja systemu po awarii karty SD
+- Przywrócono wszystkie serwisy: Mosquitto, Zigbee2MQTT, Homebridge, Pi-hole, Tailscale, Cloudflare Tunnel
+- Utworzono pełny backup systemu tar.gz (887MB)
+- Backup skopiowany na Mac Mini: `~/Backups/orangepi-backup-2025-12-05.tar.gz`
+- Skonfigurowano watchdog Cloudflare Tunnel (cron co 5 minut):
+  - Orange Pi: sprawdza cloudflared + Homebridge + Pi-hole + Zigbee2MQTT
+  - Mac Mini: sprawdza cloudflared
+- Skrypt watchdog: `/usr/local/bin/cloudflared-watchdog.sh`
+- Logi watchdog: `/var/log/cloudflared-watchdog.log`
+- Tailscale z subnet routing 192.168.0.0/24
 
 ### 2025-12-02
 - Upgrade Debian 12 (Bookworm) → 13 (Trixie)
@@ -279,21 +298,20 @@ Gravity update uruchamia się automatycznie **co 6 godzin** (0:00, 6:00, 12:00, 
 | **Homebridge** | https://homebridge.bodino.us.kg |
 | **Pi-hole** | https://pihole.bodino.us.kg |
 | **SSH Orange Pi** | `ssh -o ProxyCommand="cloudflared access ssh --hostname %h" orangepi@orangepi-ssh.bodino.us.kg` |
+| **SSH Mac Mini** | `ssh -o ProxyCommand="cloudflared access ssh --hostname %h" marekbodynek@macmini-ssh.bodino.us.kg` |
 
-### SSH do Mac Mini (przez Orange Pi)
-
-Mac Mini nie ma bezpośredniego tunelu - dostęp przez Orange Pi:
+### SSH do Mac Mini (bezpośredni tunel)
 
 ```bash
-# Z Orange Pi (po zalogowaniu przez Cloudflare Tunnel):
-ssh marekbodynek@192.168.0.106
+ssh -o ProxyCommand="cloudflared access ssh --hostname %h" marekbodynek@macmini-ssh.bodino.us.kg
 ```
 
-- **IP:** 192.168.0.106
+- **IP lokalne:** 192.168.0.106
 - **Użytkownik:** marekbodynek
 - **Hasło:** Keram1qazXSW@3edcV
+- **Tunel ID:** 877197db-185e-43e9-983b-0fd95bd422ba
 
-**Healthcheck:** Skrypt `~/tunnel-healthcheck.sh` sprawdza tunele **co 5 minut** i automatycznie restartuje cloudflared jeśli nie działa.
+**Healthcheck Orange Pi:** Skrypt `~/tunnel-healthcheck.sh` sprawdza tunele **co 5 minut** i automatycznie restartuje cloudflared jeśli nie działa.
 
 **Logi:** `/var/log/tunnel-healthcheck.log`
 
