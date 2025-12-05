@@ -13,7 +13,7 @@ Backup konfiguracji systemu smart home na Orange Pi.
 - **root:** `Orange1234!`
 - **użytkownik:** `orange` / hasło: `orange`
 
-**UWAGA:** System został zresetowany 2025-12-05. Serwisy (Homebridge, Pi-hole, Zigbee2MQTT) wymagają ponownej instalacji z backupów.
+**Status:** Wszystkie serwisy działają poprawnie po reinstalacji 2025-12-05.
 
 ## Komponenty
 
@@ -25,7 +25,7 @@ Backup konfiguracji systemu smart home na Orange Pi.
   - homebridge-z2m@1.9.3
 
 ### Zigbee2MQTT
-- **Wersja:** 2.6.3
+- **Wersja:** 2.7.0
 - **MQTT:** Mosquitto localhost:1883
 
 ### MQTT
