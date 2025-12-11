@@ -62,6 +62,19 @@ Backup konfiguracji systemu smart home na Orange Pi.
 
 ## Historia zmian
 
+### 2025-12-11
+- Pełne przywracanie Raspberry Pi po awarii karty SD (błędy EXT4)
+- Przywrócono: Pi-hole + Unbound, Cloudflare Tunnel, Tailscale, n8n
+- Backup n8n (968 MB) przywrócony z Mac Mini
+- Nowy IP Tailscale dla RPI: 100.112.174.109
+- Skrypty automatyzacji wdrożone: check-tunnels.sh, update-pihole.sh, weekly-update.sh
+
+### 2025-12-09
+- Tailscale bezpośrednio na Mac Mini (bez pośrednika RB)
+- Instalacja Jellyfin na Mac Mini (media server)
+- Streaming Koszalin → Słowenia przez Tailscale + Jellyfin
+- Uproszczona architektura: Infuse → Tailscale → Mac Mini (100.103.147.52) → Jellyfin
+
 ### 2025-12-05
 - Pełna reinstalacja systemu po awarii karty SD
 - Przywrócono wszystkie serwisy: Mosquitto, Zigbee2MQTT, Homebridge, Pi-hole, Tailscale, Cloudflare Tunnel
@@ -264,10 +277,72 @@ Gravity update uruchamia się automatycznie **co 6 godzin** (0:00, 6:00, 12:00, 
 
 ## Dostęp zdalny
 
-### Tailscale VPN (zalecane)
-- **Orange Pi IP:** 100.73.24.70
-- **Subnet routing:** 192.168.0.0/24 (cała sieć domowa)
-- **DNS przez VPN:** Pi-hole (192.168.0.133)
+### Połączenia SSH (skróty w ~/.ssh/config)
+
+| Host | Alias SSH | Metoda | Komenda |
+|------|-----------|--------|---------|
+| **Orange Pi** | `orange` | Cloudflare | `ssh orange` |
+| **Orange Pi** | `orange-local` | Lokalne IP | `ssh orange-local` |
+| **Raspberry Pi** | `rb` | Cloudflare | `ssh rb` |
+| **Raspberry Pi** | `rpi-ts` | Tailscale | `ssh rpi-ts` |
+| **Mac Mini** | `macmini` | Cloudflare | `ssh macmini` |
+
+### Orange Pi (192.168.0.133)
+
+**Dane logowania:**
+- **root:** `Orange1234!`
+- **user:** `orange` / `orange`
+
+**Serwisy Cloudflare Tunnel:**
+| Serwis | URL |
+|--------|-----|
+| **SSH** | `ssh orange` lub `ssh orange-ssh.bodino.us.kg` |
+| **Zigbee2MQTT** | https://zigbee.bodino.us.kg |
+| **Homebridge** | https://homebridge.bodino.us.kg |
+| **Pi-hole** | https://pihole.bodino.us.kg |
+
+**Tailscale IP:** 100.73.24.70
+**Subnet routing:** 192.168.0.0/24 (cała sieć domowa)
+
+### Raspberry Pi (192.168.0.189)
+
+**Dane logowania:**
+- **user:** `bodino` / `Keram1qazXSW@`
+
+**Serwisy Cloudflare Tunnel:**
+| Serwis | URL |
+|--------|-----|
+| **SSH** | `ssh rb` lub `ssh rpi-ssh.bodino.us.kg` |
+| **n8n** | https://n8n.bodino.us.kg |
+
+**Tailscale IP:** 100.112.174.109
+**Tunel ID:** 278a7b8a-8f20-4854-95f9-75ef20c332a2
+
+### Mac Mini (192.168.0.106)
+
+**Dane logowania:**
+- **user:** `marekbodynek` / `Keram1qazXSW@3edcV`
+
+**Serwisy Cloudflare Tunnel:**
+| Serwis | URL |
+|--------|-----|
+| **SSH** | `ssh macmini` lub `ssh macmini-ssh.bodino.us.kg` |
+
+**Tailscale IP:** 100.103.147.52
+**Jellyfin:** http://100.103.147.52:8096 (przez Tailscale)
+**Tunel ID:** 877197db-185e-43e9-983b-0fd95bd422ba
+**Port forwarding:** UDP 41641 → 192.168.0.106:41641 (dla bezpośredniego połączenia Tailscale)
+
+### Tailscale VPN
+
+**Urządzenia w sieci Tailscale:**
+| Urządzenie | Tailscale IP | Status |
+|------------|--------------|--------|
+| Mac Mini | 100.103.147.52 | online |
+| Apple TV | 100.85.3.71 | online |
+| MacBook Pro | 100.111.215.83 | online |
+| Orange Pi | 100.90.85.113 | online |
+| Raspberry Pi | 100.112.174.109 | online |
 
 **Instalacja:**
 - macOS: App Store lub `brew install --cask tailscale`
@@ -275,43 +350,35 @@ Gravity update uruchamia się automatycznie **co 6 godzin** (0:00, 6:00, 12:00, 
 - Zaloguj się na to samo konto Tailscale
 
 **Przez Tailscale masz dostęp do:**
-- Cała sieć domowa (192.168.0.x) przez subnet routing
-- MacMini (192.168.0.106) - dysk z filmami
-- Pi-hole, Homebridge, Zigbee2MQTT
-- Udostępnione dyski, drukarki, inne urządzenia
+- Mac Mini (100.103.147.52) - Jellyfin, dysk z filmami
+- Orange Pi (100.90.85.113) - Pi-hole, Homebridge, Zigbee2MQTT
+- Raspberry Pi (100.107.249.87) - n8n, dodatkowe serwisy
 
 **Panel administracyjny:** https://login.tailscale.com/admin
 
-### Streaming na Apple TV (Infuse)
-1. Zainstaluj **Tailscale** na Apple TV (App Store)
-2. Zaloguj się na to samo konto
-3. W **Infuse** dodaj źródło SMB:
-   - Adres: `192.168.0.106`
-   - Ścieżka: `Seagate25_5T/!!!!Filmy NB`
-   - Użytkownik/hasło: dane do MacMini
+### Streaming (Jellyfin + Infuse)
 
-### Cloudflare Tunnel (alternatywa)
-
-| Serwis | URL |
-|--------|-----|
-| **Zigbee2MQTT** | https://zigbee.bodino.us.kg |
-| **Homebridge** | https://homebridge.bodino.us.kg |
-| **Pi-hole** | https://pihole.bodino.us.kg |
-| **SSH Orange Pi** | `ssh -o ProxyCommand="cloudflared access ssh --hostname %h" orangepi@orangepi-ssh.bodino.us.kg` |
-| **SSH Mac Mini** | `ssh -o ProxyCommand="cloudflared access ssh --hostname %h" marekbodynek@macmini-ssh.bodino.us.kg` |
-
-### SSH do Mac Mini (bezpośredni tunel)
-
-```bash
-ssh -o ProxyCommand="cloudflared access ssh --hostname %h" marekbodynek@macmini-ssh.bodino.us.kg
+**Architektura (Koszalin → Słowenia):**
+```
+Infuse (Słowenia) → Tailscale → Mac Mini (100.103.147.52) → Jellyfin (:8096)
 ```
 
-- **IP lokalne:** 192.168.0.106
-- **Użytkownik:** marekbodynek
-- **Hasło:** Keram1qazXSW@3edcV
-- **Tunel ID:** 877197db-185e-43e9-983b-0fd95bd422ba
+**Konfiguracja w Infuse:**
+1. Zainstaluj **Tailscale** na Apple TV (App Store)
+2. Zaloguj się na to samo konto
+3. W **Infuse** dodaj źródło **Jellyfin**:
+   - Adres: `100.103.147.52` (Tailscale IP Mac Mini)
+   - Port: `8096`
+   - Użytkownik/hasło: dane do Jellyfin
 
-**Healthcheck Orange Pi:** Skrypt `~/tunnel-healthcheck.sh` sprawdza tunele **co 5 minut** i automatycznie restartuje cloudflared jeśli nie działa.
+**Alternatywnie (SMB):**
+- Adres: `100.103.147.52`
+- Ścieżka: `Seagate25_5T/!!!!Filmy NB`
+- Użytkownik/hasło: dane do MacMini
+
+### Healthcheck i monitoring
+
+**Orange Pi:** Skrypt `~/tunnel-healthcheck.sh` sprawdza tunele **co 5 minut** i automatycznie restartuje cloudflared jeśli nie działa.
 
 **Logi:** `/var/log/tunnel-healthcheck.log`
 
