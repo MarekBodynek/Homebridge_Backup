@@ -1,413 +1,1026 @@
-# Homebridge & Zigbee2MQTT Backup
+# Homebridge Backup - Dokumentacja Infrastruktury
 
-Backup konfiguracji systemu smart home na Orange Pi.
+**Ostatnia aktualizacja:** 2026-01-27
 
-## System
+## Spis treści
+- [Architektura systemu](#architektura-systemu)
+- [Przegląd infrastruktury](#przegląd-infrastruktury)
+- [Synology NAS DS224+](#synology-nas-ds224)
+- [Orange Pi Zero 2](#orange-pi-zero-2)
+- [Raspberry Pi 5](#raspberry-pi-5)
+- [Mac Mini](#mac-mini)
+- [Cloudflare Tunnels](#cloudflare-tunnels)
+- [Tailscale VPN](#tailscale-vpn)
+- [Harmonogram backupów](#harmonogram-backupów)
+- [Skrypty automatyzacji](#skrypty-automatyzacji)
+- [Procedury przywracania](#procedury-przywracania)
 
-- **OS:** Armbian 25.5.1 (Debian 12 Bookworm)
-- **Kernel:** 6.12.23-current-sunxi64
-- **Hardware:** Orange Pi Zero2
-- **IP:** 192.168.0.133
+---
 
-### Dane logowania
-- **root:** `Orange1234!`
-- **użytkownik:** `orange` / hasło: `orange`
+## Architektura systemu
 
-**Status:** Wszystkie serwisy działają poprawnie po reinstalacji 2025-12-05.
+```
+                          ┌─────────────────────────┐
+                          │        INTERNET         │
+                          └────────────┬────────────┘
+                                       │
+                          ┌────────────▼────────────┐
+                          │    Cloudflare Tunnels   │
+                          │     *.bodino.us.kg      │
+                          └────────────┬────────────┘
+                                       │
+    ┌──────────────────────────────────┼──────────────────────────────────┐
+    │                                  │                                  │
+┌───▼────────────────────┐  ┌──────────▼──────────┐  ┌────────────────────▼───┐
+│    RASPBERRY PI 5      │  │  ORANGE PI ZERO 2   │  │       MAC MINI         │
+│    192.168.0.188       │  │  192.168.0.133      │  │     192.168.0.106      │
+│  TS: 100.112.174.109   │  │ TS: 100.90.85.113   │  ├────────────────────────┤
+│    (główny serwer)     │  │   (backup DNS)      │  │ • Jellyfin:8096        │
+├────────────────────────┤  ├─────────────────────┤  │ • Time Machine         │
+│ • Homebridge:8581      │  │ • Pi-hole:80        │  └────────────────────────┘
+│ • Zigbee2MQTT:8080     │  │ • Unbound:5335      │
+│ • Mosquitto:1883       │  │ • Tailscale subnet  │
+│ • n8n:5678             │  │   router 192.168.0/24│
+│ • Pi-hole:80           │  └─────────────────────┘
+│ • Unbound:5335         │
+│ • Home Assistant       │       ┌─────────────────────────┐
+│ • Docker Watchdog      │       │    SYNOLOGY DS224+      │
+└───────────┬────────────┘       │    192.168.0.164        │
+            │                    │  TS: 100.106.39.80      │
+            │        SMB         ├─────────────────────────┤
+            ├────────────────────┤ • 2x18TB RAID1 (Btrfs)  │
+            │                    │ • SMB: media, backups,  │
+            │                    │   roms, timemachine     │
+            │                    └─────────────────────────┘
+            │
+            │       ┌───────────────────────────┐
+            │       │      Tailscale VPN        │
+            └───────│      (mesh network)       │
+                    └─────────────┬─────────────┘
+                                  │
+                    ┌─────────────▼─────────────┐
+                    │   Urządzenia mobilne      │
+                    │   iPhone:  100.70.222.16  │
+                    │   MacBook: 100.111.215.83 │
+                    │   AppleTV: 100.85.3.71    │
+                    └───────────────────────────┘
 
-## Komponenty
-
-### Homebridge
-- **Wersja:** 1.11.1
-- **Config UI X:** 5.9.0
-- **Plugins:**
-  - homebridge-ewelink@12.3.3
-  - homebridge-z2m@1.9.3
-
-### Zigbee2MQTT
-- **Wersja:** 2.7.0
-- **MQTT:** Mosquitto localhost:1883
-
-### MQTT
-- **Broker:** Mosquitto
-- **User:** mqtt
-- **Topic:** zigbee2mqtt
-
-### Pi-hole
-- **Wersja:** v6.3 (Core), v6.4 (Web), v6.4.1 (FTL)
-- **Panel:** http://192.168.0.133/admin
-- **Hasło:** bodino44
-- **Blokowane domeny:** 789,404 (Firebog + polskie listy)
-- **Upstream DNS:** Unbound (127.0.0.1#5335)
-- **Automatyczna aktualizacja list:** co 6 godzin
-
-### Unbound
-- **Port:** 5335
-- **Funkcja:** Rekursywny resolver DNS (brak zewnętrznych providerów)
-- **Root hints:** Aktualizowane 1. dnia każdego miesiąca
-- **Bezpieczeństwo:** DNSSEC, qname-minimisation
-
-## Backupy
-
-### Pełne archiwa
-- `homebridge-backup-20251202-141551.tar.gz` - Pełny backup /var/lib/homebridge
-- `zigbee2mqtt-backup-20251202-141551.tar.gz` - Pełny backup /opt/zigbee2mqtt/data
-- `tailscale-backup-20251202-141551.tar.gz` - Pełny backup /var/lib/tailscale
-
-**Uwaga:** Backup Pi-hole (~90 MB) tylko na Orange Pi (`~/backups/`) - za duży dla GitHub.
-
-### Pliki konfiguracyjne
-- `homebridge-config.json` - Konfiguracja Homebridge
-- `zigbee2mqtt-config.yaml` - Konfiguracja Zigbee2MQTT
-
-## Historia zmian
-
-### 2025-12-11
-- Pełne przywracanie Raspberry Pi po awarii karty SD (błędy EXT4)
-- Przywrócono: Pi-hole + Unbound, Cloudflare Tunnel, Tailscale, n8n
-- Backup n8n (968 MB) przywrócony z Mac Mini
-- Nowy IP Tailscale dla RPI: 100.112.174.109
-- Skrypty automatyzacji wdrożone: check-tunnels.sh, update-pihole.sh, weekly-update.sh
-
-### 2025-12-09
-- Tailscale bezpośrednio na Mac Mini (bez pośrednika RB)
-- Instalacja Jellyfin na Mac Mini (media server)
-- Streaming Koszalin → Słowenia przez Tailscale + Jellyfin
-- Uproszczona architektura: Infuse → Tailscale → Mac Mini (100.103.147.52) → Jellyfin
-
-### 2025-12-05
-- Pełna reinstalacja systemu po awarii karty SD
-- Przywrócono wszystkie serwisy: Mosquitto, Zigbee2MQTT, Homebridge, Pi-hole, Tailscale, Cloudflare Tunnel
-- Utworzono pełny backup systemu tar.gz (887MB)
-- Backup skopiowany na Mac Mini: `~/Backups/orangepi-backup-2025-12-05.tar.gz`
-- Skonfigurowano watchdog Cloudflare Tunnel (cron co 5 minut):
-  - Orange Pi: sprawdza cloudflared + Homebridge + Pi-hole + Zigbee2MQTT
-  - Mac Mini: sprawdza cloudflared
-- Skrypt watchdog: `/usr/local/bin/cloudflared-watchdog.sh`
-- Logi watchdog: `/var/log/cloudflared-watchdog.log`
-- Tailscale z subnet routing 192.168.0.0/24
-
-### 2025-12-02
-- Upgrade Debian 12 (Bookworm) → 13 (Trixie)
-- Upgrade Pi-hole v6.2.2 → v6.3 (Core), v6.4 (Web), v6.4.1 (FTL)
-- Naprawiono uprawnienia /etc/pihole/versions
-- Naprawiono zmienną środowiskową TERM dla Pi-hole
-- Naprawiono konfigurację dpkg (base-files)
-- Aktualizacja backupów (Homebridge, Zigbee2MQTT, Tailscale)
-
-### 2025-11-27
-- Zamiana WireGuard na Tailscale (łatwiejsza konfiguracja, wsparcie Apple TV)
-- Orange Pi jako subnet router (192.168.0.0/24)
-- Dostęp do całej sieci domowej przez Tailscale
-- Streaming filmów z MacMini na Apple TV przez Infuse
-
-### 2025-11-26
-- Instalacja WireGuard VPN (wireguard-go dla kernel 4.9) - zastąpione przez Tailscale
-- Konfiguracja Cloudflare DDNS (vpn.bodino.us.kg)
-- Automatyczna aktualizacja IP co 5 minut
-- Port forwarding 51820 UDP na routerze TP-Link
-- Klient VPN skonfigurowany na MacBooku
-
-### 2025-11-25
-- Naprawa przycisku Zigbee "Włącznik brama garażowa" (rekonfiguracja urządzenia)
-- Naprawa wyświetlania przycisku w HomeKit (usunięcie uszkodzonego cache)
-- Przycisk działa z akcjami: single, double, long
-
-### 2025-11-22
-- Instalacja Unbound (rekursywny resolver DNS)
-- Pi-hole używa teraz Unbound zamiast Cloudflare/Google
-- Dodanie 27 list blokujących z Firebog
-- Dodanie 7 polskich list blokujących (KADhosts, CERT Polska, Polish Ads Filter)
-- Ręczne blokowanie polskich domen reklamowych (onetads.pl, gemius.pl, adocean)
-- Automatyczna aktualizacja list Pi-hole co 6 godzin
-- Backup URL-i adlist w cotygodniowej konserwacji
-- Odświeżenie gravity po aktualizacji systemu
-- Konfiguracja DNS na routerze (192.168.0.133)
-- Instalacja Fail2ban (ochrona przed brute-force SSH)
-- SSH hardening (brak root, max 3 próby)
-- Automatyczne aktualizacje bezpieczeństwa (unattended-upgrades)
-
-### 2025-11-21
-- Aktualizacja systemu (apt upgrade, npm 11.6.3, pnpm 10.23.0)
-- Aktualizacja backupów (Homebridge, Zigbee2MQTT, Pi-hole)
-- Konfiguracja Cloudflare Tunnel (SSH + WWW)
-
-### 2025-11-16
-- Wyłączenie harmonogramów Zigbee w regulatorach TRV (konflikt z HomeKit)
-- Ustawienie 3/4 regulatorów na tryb MANUAL (HomeKit kontroluje temperaturę)
-- Utworzenie skryptu disable-zigbee-schedules.sh
-- Aktualizacja backupów (Homebridge, Zigbee2MQTT, Pi-hole)
-
-### 2025-11-14
-- Upgrade Debian 11 → 12 (Bookworm)
-- Upgrade Node.js 20 → 22
-- Upgrade npm 10.9.4 → 11.6.2
-- Rebuild Homebridge dla Node.js v22
-- Naprawa Mosquitto MQTT (wykomentowano pid_file)
-- Instalacja Pi-hole v6.2.2 (blokowanie reklam sieciowych)
-- Utworzenie pełnych backupów (Homebridge, Zigbee2MQTT, Pi-hole)
-
-## Urządzenia Zigbee
-
-### Czujniki temperatury
-- Czujnik temperatury jadalnia
-- Czujnik temperatury łazienka góra
-- Czujnik temperatury hall
-- Czujnik temperatury garaż
-
-### Regulatory kaloryferów (TRV)
-- Regulator kaloryfer jadalnia
-- Regulator kaloryfer sypialnia
-- Regulator kaloryfer biuro
-- Regulator kaloryfer pokój Patryka
-
-**WAŻNE:** Wszystkie regulatory są skonfigurowane w trybie MANUAL, aby HomeKit był głównym źródłem kontroli temperatury. Harmonogramy Zigbee są wyłączone, aby nie kolidowały z automatyzacjami HomeKit.
-
-### Inne urządzenia
-- Czujnik ruchu łazienka dół
-- Włącznik brama garażowa
-
-## Przywracanie z backupu
-
-### Homebridge
-```bash
-sudo systemctl stop homebridge
-sudo rm -rf /var/lib/homebridge
-sudo tar -xzf homebridge-backup-20251121-205023.tar.gz -C /var/lib/
-sudo systemctl start homebridge
+PRZEPŁYW DANYCH:
+────────────────
+Internet → Cloudflare → Urządzenie lokalne (HTTPS/SSH)
+Urządzenia Zigbee → Zigbee2MQTT → Mosquitto → Homebridge → HomeKit
+Apple TV → Cloudflare (jellyfin.bodino.us.kg) → Mac Mini (Jellyfin streaming)
+Raspberry Pi ← SMB → NAS (ROMs, media, backups)
+Mac Mini ← Time Machine → NAS
 ```
 
-### Zigbee2MQTT
+---
+
+## Przegląd infrastruktury
+
+| Urządzenie | IP Ethernet | IP WiFi | IP Tailscale | System | Rola |
+|------------|-------------|---------|--------------|--------|------|
+| Synology DS224+ | 192.168.0.164 | - | 100.106.39.80 | DSM 7 | NAS (storage, backups, Time Machine), qBittorrent |
+| Bodino_NAS | 192.168.0.110 | - | - | - | Stary NAS (zdjęcia) |
+| Orange Pi Zero 2 | 192.168.0.133 | 192.168.0.134 | 100.90.85.113 | Armbian 25.11.2 (Bookworm) | Pi-hole (backup DNS), Tailscale subnet router |
+| Raspberry Pi 5 | 192.168.0.188 | - | 100.112.174.109 | Debian 13 (Trixie), NVMe SSD | Homebridge, Zigbee2MQTT, n8n, Pi-hole, Home Assistant |
+| Mac Mini | 192.168.0.106 | - | - | macOS | Jellyfin |
+| Apple TV | - | - | 100.85.3.71 | tvOS | Streaming Jellyfin |
+
+---
+
+## Synology NAS DS224+
+
+### Dane dostępowe
+
+| Parametr | Wartość |
+|----------|---------|
+| **Model** | Synology DS224+ |
+| **IP** | 192.168.0.164 |
+| **User** | Bodino |
+| **Hasło** | Keram1qazXSW@ |
+| **SSH** | Włączone (port 22) |
+| **System** | DSM 7 |
+
+### Specyfikacja
+
+| Parametr | Wartość |
+|----------|---------|
+| **Dyski** | 2x 18TB (RAID 1) |
+| **Pojemność użytkowa** | ~16 TB |
+| **System plików** | Btrfs |
+| **RAM** | 18 GB (1x2GB + 1x16GB) |
+
+### Foldery współdzielone
+
+| Nazwa | Ścieżka | Opis |
+|-------|---------|------|
+| media | /volume1/media | Biblioteka multimediów (Jellyfin) |
+| backups | /volume1/backups | Kopie zapasowe |
+| roms | /volume1/roms | ROMs dla RetroArch |
+| timemachine | /volume1/timemachine | Time Machine dla Mac |
+
+### Dostęp SSH
+
 ```bash
-sudo systemctl stop zigbee2mqtt
-sudo rm -rf /opt/zigbee2mqtt/data
-sudo tar -xzf zigbee2mqtt-backup-20251121-205023.tar.gz -C /opt/zigbee2mqtt/
-sudo systemctl start zigbee2mqtt
+ssh Bodino@192.168.0.164
+# Hasło: Keram1qazXSW@
 ```
 
-### Pi-hole
+### Komendy administracyjne
+
 ```bash
-sudo systemctl stop pihole-FTL
-sudo rm -rf /etc/pihole
-sudo tar -xzf pihole-backup-20251127-011658.tar.gz -C /etc/
-sudo systemctl start pihole-FTL
+# Lista udostępnień
+sudo /usr/syno/sbin/synoshare --enum LOCAL
+
+# Dodaj udostępnienie
+sudo /usr/syno/sbin/synoshare --add <name> <desc> <path> '' <rw_user> '' 1 0
+
+# Status RAID
+cat /proc/mdstat
+
+# Użycie dysków
+df -h /volume1
 ```
+
+### Cloudflare Tunnel
+
+**Tunnel ID:** `268f4074-6efc-4cfb-acd8-ae7be8041a0b`
+**Credentials:** `/volume1/cloudflared/.cloudflared/268f4074-6efc-4cfb-acd8-ae7be8041a0b.json`
+**Binary:** `/volume1/cloudflared/cloudflared`
+
+```yaml
+# /volume1/cloudflared/config.yml
+tunnel: 268f4074-6efc-4cfb-acd8-ae7be8041a0b
+credentials-file: /volume1/cloudflared/.cloudflared/268f4074-6efc-4cfb-acd8-ae7be8041a0b.json
+
+ingress:
+  - hostname: nas.bodino.us.kg
+    service: https://localhost:5001
+    originRequest:
+      noTLSVerify: true
+  - hostname: nas-ssh.bodino.us.kg
+    service: ssh://localhost:22
+  - service: http_status:404
+```
+
+**Uruchomienie tunelu:**
+```bash
+HOME=/volume1/cloudflared nohup /volume1/cloudflared/cloudflared tunnel --config /volume1/cloudflared/config.yml run > /volume1/cloudflared/tunnel.log 2>&1 &
+```
+
+### Uwagi
+
+- **Time Machine**: Wymaga włączenia w DSM → Control Panel → File Services → SMB → Advanced → Enable Time Machine
+- **Połączenie z RPi**: RPi ma osobną trasę routingu dla NAS (omija Tailscale subnet routing)
+- **Cloudflare Tunnel**: Uruchamiany ręcznie (Synology nie ma systemd)
 
 ### Tailscale
+
+**Binary:** `/volume1/tailscale/tailscale`, `/volume1/tailscale/tailscaled`
+**State:** `/volume1/tailscale/state/tailscaled.state`
+**Socket:** `/volume1/tailscale/tailscaled.sock`
+**IP Tailscale:** `100.106.39.80`
+
+**Uruchomienie:**
 ```bash
-sudo systemctl stop tailscaled
-sudo rm -rf /var/lib/tailscale
-sudo tar -xzf tailscale-backup-20251127-012915.tar.gz -C /var/lib/
-sudo systemctl start tailscaled
+# Daemon
+sudo /volume1/tailscale/tailscaled --state=/volume1/tailscale/state/tailscaled.state --socket=/volume1/tailscale/tailscaled.sock &
+
+# Status
+sudo /volume1/tailscale/tailscale --socket=/volume1/tailscale/tailscaled.sock status
 ```
 
-## Zarządzanie harmonogramami regulatorów
+---
 
-### Problem: Konflikt między Zigbee a HomeKit
+## Bodino_NAS (stary NAS)
 
-Regulatory TRV (Thermostatic Radiator Valve) mają wbudowane harmonogramy, które mogą kolidować z automatyzacjami HomeKit. Aby HomeKit był głównym źródłem kontroli:
+### Dane dostępowe
 
-1. **Wszystkie regulatory są w trybie MANUAL** - nie używają wbudowanych harmonogramów Zigbee
-2. **HomeKit kontroluje temperaturę** - przez automatyzacje i sceny
-3. **Brak konfliktów** - harmonogramy Zigbee są wyłączone
+| Parametr | Wartość |
+|----------|---------|
+| **Hostname** | Bodino_NAS |
+| **IP** | 192.168.0.110 |
+| **User** | admin |
+| **Hasło** | Keram23weSDXC |
 
-### Wyłączenie harmonogramów Zigbee
+### Uwagi
 
-Jeśli regulatory wróciły do trybu AUTO lub mają aktywne harmonogramy, uruchom skrypt:
+- Stary NAS używany głównie do przechowywania zdjęć
+- Zdjęcia mają być zmigrowane na nowy Synology DS224+
 
+---
+
+## Orange Pi Zero 2
+
+### Dane dostępowe
+
+| Parametr | Wartość |
+|----------|---------|
+| **IP Ethernet (end0)** | 192.168.0.133 |
+| **IP WiFi (wlan0)** | 192.168.0.134 |
+| **WiFi SSID** | Bodino_LTE_2.4 |
+| **WiFi MAC** | 2c:2c:78:fb:20:3d |
+| **IP Tailscale** | 100.90.85.113 |
+| **User** | root |
+| **Hasło** | Keram1qazXSW@ |
+| **System** | Armbian 25.11.2 bookworm (kernel 6.12.23) |
+
+### Serwisy
+
+| Serwis | Port | Opis |
+|--------|------|------|
+| Pi-hole | 80 | DNS ad-blocking (backup) |
+| Unbound | 5335 | Rekursywny DNS |
+| Cloudflared | - | Cloudflare tunnel |
+| Tailscale | - | VPN mesh |
+
+> **Uwaga:** Homebridge, Zigbee2MQTT i Mosquitto zostały przeniesione na Raspberry Pi w dniu 2025-12-13.
+
+### Cloudflare Tunnel
+
+**Tunnel ID:** `cd9b3d38-ccd1-4adf-a88f-f177df0bcb8d`
+**Credentials:** `/root/.cloudflared/cd9b3d38-ccd1-4adf-a88f-f177df0bcb8d.json`
+
+```yaml
+# /etc/cloudflared/config.yml
+tunnel: cd9b3d38-ccd1-4adf-a88f-f177df0bcb8d
+credentials-file: /root/.cloudflared/cd9b3d38-ccd1-4adf-a88f-f177df0bcb8d.json
+
+ingress:
+  - hostname: pihole-orange.bodino.us.kg
+    service: http://localhost:80
+  - hostname: orange-ssh.bodino.us.kg
+    service: tcp://localhost:22
+  - service: http_status:404
+```
+
+### Unbound
+
+**Config:** `/etc/unbound/unbound.conf.d/pi-hole.conf`
+
+```conf
+server:
+    verbosity: 0
+    interface: 127.0.0.1
+    port: 5335
+    do-ip4: yes
+    do-udp: yes
+    do-tcp: yes
+    do-ip6: no
+    prefer-ip6: no
+    harden-glue: yes
+    harden-dnssec-stripped: yes
+    use-caps-for-id: no
+    edns-buffer-size: 1232
+    prefetch: yes
+    num-threads: 1
+    so-rcvbuf: 1m
+    private-address: 192.168.0.0/16
+    private-address: 169.254.0.0/16
+    private-address: 172.16.0.0/12
+    private-address: 10.0.0.0/8
+    private-address: fd00::/8
+    private-address: fe80::/10
+```
+
+### Cron Jobs
+
+| Kiedy | Co | Skrypt |
+|-------|-----|--------|
+| Co 6h | Aktualizacja Pi-hole gravity | `/usr/local/bin/update-pihole.sh` |
+| Niedziela 3:00 | Aktualizacja systemu i serwisów | `/usr/local/bin/weekly-update.sh` |
+
+### Klucze SSH (authorized_keys)
+
+```
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDbxXEHfLMii5ldtjfBeZsJ9I8L+OuVdowq7NqmFyJtL0QQWeN6CkOSJlhdKRFfzeq4U3cMC0qjF4S47RPt85mu1g97GIL8KSK8kmjK2E5OCGI6CXaKP+tCYbOdHgdQWhwpWkJGYbHQjQJHC0PV9Knr4Y2jHzfNjI1dWSdph/woapx01g5gH203iZSgRyvyJjMexf+rfD9Nj0quGEY+dpuedtAJ1C1PekKhIukOXqrC/KAdUDNSpYf2yUg7et1ytyYI66tXCl8W8aYB0s++ZuLl5KAOboZc7ZFh8gq/BB7s+A+Yyqt2XotG4N6y9/ZqzyGRHn5Tqsxcf+MooXRhOohSoi9PuTzB85wk7C3TxPbP80RmPyUgXWy9/iSJEfgdPOmsBwEVXPIZS8yt0XAl2738weMu+zUNHqCSXJ2an0QeTmvgHHnBbuIz0vggrowxQNiTSxmIymB+J4ljgamhU6vI59mC8ET8ae31QXhkMPyeSIKh11RvlzEQMO+t2Svqgo0= marekbodynek@Mac-mini-Marek.local
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPct3X9adLcLmUHRdWaq0lwvsiGO3o7uR4iuC0/ChAP0 marek@mac
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO7sAbFYGdVUWaNd12Zuj1BGD1X1nBRKL8ufN52E5bCG root@raspberrypi
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFbPQdvqjne28bG+vUOUZoUxRMTs2+r4mz5G4n7XQagX bodino@BodinoPi
+```
+
+---
+
+## Raspberry Pi 5
+
+### Dane dostępowe
+
+| Parametr | Wartość |
+|----------|---------|
+| **IP Ethernet (eth0)** | 192.168.0.188 |
+| **IP WiFi (wlan0)** | - (nieaktywne) |
+| **Ethernet MAC** | 88:a2:9e:57:e8:b5 |
+| **WiFi SSID** | Bodino_LTE_2.4 |
+| **IP Tailscale** | 100.112.174.109 |
+| **User** | bodino |
+| **Hasło** | Keram1qazXSW@ |
+| **System** | Debian 13 (Trixie), kernel 6.12.47 |
+| **Boot** | NVMe SSD (Samsung 990 EVO Plus 2TB) |
+| **Pi-hole hasło** | bodino44 |
+
+### Serwisy
+
+| Serwis | Port | Opis |
+|--------|------|------|
+| Homebridge | 8581 (UI), 51641 (HAP) | Smart home bridge |
+| Zigbee2MQTT | 8080 | Most Zigbee-MQTT |
+| Mosquitto | 1883 | MQTT broker |
+| n8n | 5678 | Automatyzacja workflow |
+| Pi-hole | 80 | DNS ad-blocking |
+| Unbound | 5335 | Rekursywny DNS |
+| Home Assistant | 8123 | Docker kontener |
+| Docker Watchdog | - | Monitoring HA (co 15 min) |
+| Cloudflared | - | Cloudflare tunnel |
+| Tailscale | - | VPN mesh |
+
+### Cloudflare Tunnel
+
+**Tunnel ID:** `278a7b8a-8f20-4854-95f9-75ef20c332a2`
+**Credentials:** `/home/bodino/.cloudflared/278a7b8a-8f20-4854-95f9-75ef20c332a2.json`
+
+```yaml
+# /etc/cloudflared/config.yml
+tunnel: 278a7b8a-8f20-4854-95f9-75ef20c332a2
+credentials-file: /home/bodino/.cloudflared/278a7b8a-8f20-4854-95f9-75ef20c332a2.json
+
+ingress:
+  - hostname: rpi-ssh.bodino.us.kg
+    service: ssh://localhost:22
+  - hostname: n8n.bodino.us.kg
+    service: http://localhost:5678
+  - hostname: pihole.bodino.us.kg
+    service: http://localhost:80
+  - hostname: homebridge.bodino.us.kg
+    service: http://localhost:8581
+  - hostname: zigbee.bodino.us.kg
+    service: http://localhost:8080
+  - hostname: ha.bodino.us.kg
+    service: http://localhost:8123
+  - service: http_status:404
+```
+
+### Homebridge
+
+**Config:** `/var/lib/homebridge/config.json`
+
+```json
+{
+    "bridge": {
+        "name": "Homebridge Bodino",
+        "username": "0E:39:36:5E:B7:15",
+        "port": 51641,
+        "pin": "100-00-100"
+    },
+    "platforms": [
+        {
+            "name": "Config",
+            "port": 8581,
+            "auth": "form",
+            "platform": "config",
+            "standalone": true
+        },
+        {
+            "mqtt": {
+                "base_topic": "zigbee2mqtt",
+                "server": "mqtt://localhost:1883",
+                "user": "mqtt",
+                "password": "mqtt"
+            },
+            "platform": "zigbee2mqtt"
+        },
+        {
+            "name": "eWeLink",
+            "username": "bodinoo@interia.pl",
+            "password": "bodino44",
+            "platform": "eWeLink"
+        }
+    ]
+}
+```
+
+### Zigbee2MQTT
+
+**Config:** `/opt/zigbee2mqtt/data/configuration.yaml`
+
+```yaml
+frontend:
+  enabled: true
+  port: 8080
+mqtt:
+  base_topic: zigbee2mqtt
+  server: mqtt://localhost:1883
+  user: mqtt
+  password: mqtt
+serial:
+  port: /dev/ttyUSB0
+advanced:
+  log_level: debug
+  network_key:
+    - 219
+    - 194
+    - 126
+    - 138
+    - 138
+    - 160
+    - 109
+    - 93
+    - 7
+    - 251
+    - 120
+    - 73
+    - 211
+    - 234
+    - 115
+    - 179
+```
+
+### n8n
+
+**Config:** `/home/bodino/.n8n/config`
+
+```json
+{
+    "encryptionKey": "9gk3a1bZUB2jOy3bbZXl0YiIqQdjaBTW"
+}
+```
+
+**Systemd service:** `/etc/systemd/system/n8n.service`
+
+```ini
+[Unit]
+Description=n8n - Workflow Automation
+After=network.target
+
+[Service]
+Type=simple
+User=bodino
+WorkingDirectory=/home/bodino
+Environment="N8N_HOST=0.0.0.0"
+Environment="N8N_PORT=5678"
+Environment="N8N_PROTOCOL=http"
+Environment="WEBHOOK_URL=https://n8n.bodino.us.kg/"
+ExecStart=/usr/bin/n8n start
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### Unbound
+
+**Config:** `/etc/unbound/unbound.conf.d/pi-hole.conf`
+
+```conf
+server:
+    verbosity: 0
+    interface: 127.0.0.1
+    port: 5335
+    do-ip4: yes
+    do-udp: yes
+    do-tcp: yes
+    do-ip6: no
+    prefer-ip6: no
+    harden-glue: yes
+    harden-dnssec-stripped: yes
+    use-caps-for-id: no
+    edns-buffer-size: 1232
+    prefetch: yes
+    num-threads: 1
+    so-rcvbuf: 1m
+    private-address: 192.168.0.0/16
+    private-address: 169.254.0.0/16
+    private-address: 172.16.0.0/12
+    private-address: 10.0.0.0/8
+```
+
+### Cron Jobs
+
+**Plik:** `/etc/cron.d/rpi-automation`
+
+| Kiedy | Co | Skrypt |
+|-------|-----|--------|
+| Co 5 min | Sprawdzanie tuneli | `/usr/local/bin/check-tunnels.sh` |
+| Co 6h | Aktualizacja Pi-hole gravity | `/usr/local/bin/update-pihole.sh` |
+| Niedziela 3:00 | Aktualizacja systemu i serwisów | `/usr/local/bin/weekly-update.sh` |
+
+### RetroArch + Emulatory
+
+**ROMy:** Montowane z NAS przez SMB (`/mnt/roms`)
+
+| Emulator | Platforma | Komenda |
+|----------|-----------|---------|
+| RetroArch | Multi-platform | `retroarch` |
+| Duckstation | PlayStation 1 | `duckstation` |
+| Dolphin | GameCube/Wii | `dolphin-emu` |
+| MAME | Arcade | `mame` |
+| Mednafen | NES/GB/PCE/Lynx | `mednafen` |
+| VICE | C64/128/VIC20 | `x64sc` |
+| FS-UAE | Amiga | `fs-uae` |
+| Hatari | Atari ST | `hatari` |
+| Stella | Atari 2600 | `stella` |
+| Atari800 | Atari 800/XL/XE/5200 | `atari800` |
+| Fuse | ZX Spectrum | `fuse` |
+| DOSBox | DOS | `dosbox` |
+| Osmose | Master System/Game Gear | `osmose` |
+| PCSXR | PlayStation 1 | `pcsxr` |
+
+**SMB Mount:** `/etc/fstab`
+```
+//192.168.0.164/roms /mnt/roms cifs credentials=/etc/smb-credentials-nas,uid=1000,gid=1000,iocharset=utf8,vers=3.0,nofail 0 0
+```
+
+**Credentials:** `/etc/smb-credentials-nas` (chmod 600)
+```
+username=Bodino
+password=Keram1qazXSW@
+```
+
+### NAS Route Fix (Tailscale)
+
+Orange Pi reklamuje podsieć 192.168.0.0/24 przez Tailscale, co powoduje że ruch do NAS idzie przez tunel.
+Rozwiązanie: systemd service który usuwa tę trasę i dodaje bezpośrednią trasę do NAS.
+
+**Service:** `/etc/systemd/system/nas-route.service`
+```ini
+[Unit]
+Description=Fix NAS route for Tailscale
+After=network-online.target tailscaled.service
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/sleep 10
+ExecStart=/bin/bash -c 'ip route del 192.168.0.0/24 dev tailscale0 table 52 2>/dev/null; ip route add 192.168.0.164/32 dev eth0 src 192.168.0.188 2>/dev/null || true'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### Docker Watchdog
+
+**Script:** `/usr/local/bin/docker-watchdog.sh`
+**Cron:** `*/15 * * * *`
+
+Sprawdza co 15 minut:
+1. Czy Docker daemon działa
+2. Czy kontener homeassistant jest uruchomiony
+3. Czy HA odpowiada na port 8123
+
+**Logi:** `/var/log/docker-watchdog.log`
+
+### Klucze SSH (authorized_keys)
+
+```
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPct3X9adLcLmUHRdWaq0lwvsiGO3o7uR4iuC0/ChAP0 marek@mac
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDbxXEHfLMii5ldtjfBeZsJ9I8L+OuVdowq7NqmFyJtL0QQWeN6CkOSJlhdKRFfzeq4U3cMC0qjF4S47RPt85mu1g97GIL8KSK8kmjK2E5OCGI6CXaKP+tCYbOdHgdQWhwpWkJGYbHQjQJHC0PV9Knr4Y2jHzfNjI1dWSdph/woapx01g5gH203iZSgRyvyJjMexf+rfD9Nj0quGEY+dpuedtAJ1C1PekKhIukOXqrC/KAdUDNSpYf2yUg7et1ytyYI66tXCl8W8aYB0s++ZuLl5KAOboZc7ZFh8gq/BB7s+A+Yyqt2XotG4N6y9/ZqzyGRHn5Tqsxcf+MooXRhOohSoi9PuTzB85wk7C3TxPbP80RmPyUgXWy9/iSJEfgdPOmsBwEVXPIZS8yt0XAl2738weMu+zUNHqCSXJ2an0QeTmvgHHnBbuIz0vggrowxQNiTSxmIymB+J4ljgamhU6vI59mC8ET8ae31QXhkMPyeSIKh11RvlzEQMO+t2Svqgo0= marekbodynek@Mac-mini-Marek.local
+```
+
+---
+
+## Mac Mini
+
+### Dane dostępowe
+
+| Parametr | Wartość |
+|----------|---------|
+| **IP lokalne** | 192.168.0.106 |
+| **User** | marekbodynek |
+| **Hasło** | Keram1qazXSW@3edcV |
+| **System** | macOS |
+
+### Serwisy
+
+| Serwis | Port | Opis |
+|--------|------|------|
+| Jellyfin | 8096 | Media server |
+| Time Machine | - | Backup na NAS (//192.168.0.164/timemachine) |
+| Cloudflared | - | Cloudflare tunnel |
+
+> **Uwaga:** Docker został usunięty z Mac Mini. Home Assistant przeniesiony na RPi (2025-12-14).
+
+### Cloudflare Tunnel
+
+**Tunnel ID:** `877197db-185e-43e9-983b-0fd95bd422ba`
+**Credentials:** `/Users/marekbodynek/.cloudflared/877197db-185e-43e9-983b-0fd95bd422ba.json`
+
+```yaml
+# ~/.cloudflared/config.yml
+tunnel: 877197db-185e-43e9-983b-0fd95bd422ba
+credentials-file: /Users/marekbodynek/.cloudflared/877197db-185e-43e9-983b-0fd95bd422ba.json
+
+ingress:
+  - hostname: jellyfin.bodino.us.kg
+    service: http://localhost:8096
+  - hostname: macmini-ssh.bodino.us.kg
+    service: ssh://localhost:22
+  - service: http_status:404
+```
+
+### Cron Jobs
+
+| Kiedy | Co | Skrypt |
+|-------|-----|--------|
+| Co 5 min | Watchdog cloudflared | `/usr/local/bin/cloudflared-watchdog.sh` |
+| Codziennie 1:00 | Backup konfiguracji serwisów | `/Users/marekbodynek/scripts/backup-services.sh` |
+| Niedziela 2:00 | Pełny backup obrazów systemów | `/Users/marekbodynek/scripts/backup-servers.sh` |
+
+### Lokalizacja backupów
+
+**Dysk:** Seagate25_5T (5 TB)
+**Ścieżka:** `/Volumes/Seagate25_5T/.backups/`
+
+| Folder | Zawartość | Retencja |
+|--------|-----------|----------|
+| `/` | Pełne obrazy dd (RPi, OPi) | 2 kopie |
+| `/services/` | Konfiguracje serwisów | 7 dni |
+
+---
+
+## Cloudflare Tunnels
+
+### Podsumowanie tuneli
+
+| Tunel | Urządzenie | Tunnel ID | Hostname |
+|-------|------------|-----------|----------|
+| orangepi | Orange Pi | cd9b3d38-ccd1-4adf-a88f-f177df0bcb8d | pihole-orange, orange-ssh |
+| raspberry-pi | Raspberry Pi | 278a7b8a-8f20-4854-95f9-75ef20c332a2 | rpi-ssh, n8n, pihole, homebridge, zigbee, ha |
+| macmini-tunnel-new | Mac Mini | 877197db-185e-43e9-983b-0fd95bd422ba | jellyfin, macmini-ssh |
+| nas-tunnel | Synology NAS | 268f4074-6efc-4cfb-acd8-ae7be8041a0b | nas, nas-ssh |
+
+### Dostępne endpointy
+
+| URL | Serwis | Urządzenie |
+|-----|--------|------------|
+| https://ha.bodino.us.kg | Home Assistant | Raspberry Pi |
+| https://homebridge.bodino.us.kg | Homebridge UI | Raspberry Pi |
+| https://zigbee.bodino.us.kg | Zigbee2MQTT | Raspberry Pi |
+| https://n8n.bodino.us.kg | n8n | Raspberry Pi |
+| https://pihole.bodino.us.kg | Pi-hole (RPi) | Raspberry Pi |
+| https://pihole-orange.bodino.us.kg | Pi-hole (Orange) | Orange Pi |
+| https://jellyfin.bodino.us.kg | Jellyfin | Mac Mini |
+| https://nas.bodino.us.kg | DSM Panel | Synology NAS |
+
+### SSH przez Cloudflare
+
+Dodaj do `~/.ssh/config`:
+
+```
+Host orange-ssh.bodino.us.kg
+    ProxyCommand /usr/local/bin/cloudflared access ssh --hostname %h
+
+Host rpi-ssh.bodino.us.kg
+    ProxyCommand /usr/local/bin/cloudflared access ssh --hostname %h
+
+Host macmini-ssh.bodino.us.kg
+    ProxyCommand /usr/local/bin/cloudflared access ssh --hostname %h
+
+Host nas-ssh.bodino.us.kg
+    ProxyCommand /usr/local/bin/cloudflared access ssh --hostname %h
+```
+
+---
+
+## Tailscale VPN
+
+### Urządzenia w sieci
+
+| Urządzenie | Tailscale IP | Tailscale SSH | Status |
+|------------|--------------|---------------|--------|
+| Synology NAS | 100.106.39.80 | - | online |
+| Orange Pi | 100.90.85.113 | ✓ | online |
+| Raspberry Pi | 100.112.174.109 | ✓ | online |
+| MacBook Pro | 100.111.215.83 | - | online |
+| Apple TV | 100.85.3.71 | - | online |
+| iPhone | 100.70.222.16 | - | online |
+
+### Instalacja Tailscale
+
+**macOS:**
 ```bash
-chmod +x disable-zigbee-schedules.sh
-./disable-zigbee-schedules.sh
+brew install --cask tailscale
 ```
 
-Skrypt ustawi wszystkie regulatory na:
-- `preset: manual` - wyłącza harmonogramy Zigbee
-- `system_mode: heat` - zapewnia tryb grzania bez automatyki
-
-### Weryfikacja
-
-Sprawdź ustawienia w:
-- **Zigbee2MQTT Frontend:** http://localhost:8080 (lub http://192.168.0.133:8080)
-- **Aplikacja Home:** iOS/macOS
-
-Każdy regulator powinien pokazywać:
-- Preset: Manual
-- System Mode: Heat
-
-## Automatyczna konserwacja
-
-### Cotygodniowa konserwacja
-Skrypt `~/weekly-maintenance.sh` uruchamia się automatycznie **co niedzielę o 3:00**:
-
-1. **Backup** → `/home/orangepi/backups/`
-   - Homebridge, Zigbee2MQTT, Pi-hole, Tailscale
-   - URL-e list Pi-hole (pihole-adlists-*.txt)
-   - Stare backupy (>30 dni) usuwane automatycznie
-
-2. **Aktualizacja**
-   - apt upgrade
-   - npm, pnpm
-   - Tailscale
-
-3. **Odświeżenie Pi-hole**
-   - `pihole -g` po aktualizacji systemu
-
-4. **Sprawdzenie aktualizacji Zigbee**
-   - Firmware urządzeń OTA
-
-5. **Sprawdzenie aktualizacji Homebridge**
-   - Pluginy npm
-
-**Logi:** `/var/log/weekly-maintenance.log`
-
-### Codzienna konserwacja pamięci
-Skrypt `~/memory-cleanup.sh` uruchamia się automatycznie **codziennie o 4:00**:
-- Czyści cache systemowy (`drop_caches`)
-- Restartuje Pi-hole jeśli używa >150 MB RAM
-- Orange Pi ma tylko 964 MB RAM
-
-**Logi:** `/var/log/memory-cleanup.log`
-
-### Aktualizacja list Pi-hole
-Gravity update uruchamia się automatycznie **co 6 godzin** (0:00, 6:00, 12:00, 18:00):
-- Pobiera najnowsze wersje list blokujących (Firebog)
-- Przebudowuje bazę gravity.db
-
-**Logi:** `/var/log/pihole-gravity-update.log`
-
-## Dostęp zdalny
-
-### Połączenia SSH (skróty w ~/.ssh/config)
-
-| Host | Alias SSH | Metoda | Komenda |
-|------|-----------|--------|---------|
-| **Orange Pi** | `orange` | Cloudflare | `ssh orange` |
-| **Orange Pi** | `orange-local` | Lokalne IP | `ssh orange-local` |
-| **Raspberry Pi** | `rb` | Cloudflare | `ssh rb` |
-| **Raspberry Pi** | `rpi-ts` | Tailscale | `ssh rpi-ts` |
-| **Mac Mini** | `macmini` | Cloudflare | `ssh macmini` |
-
-### Orange Pi (192.168.0.133)
-
-**Dane logowania:**
-- **root:** `Orange1234!`
-- **user:** `orange` / `orange`
-
-**Serwisy Cloudflare Tunnel:**
-| Serwis | URL |
-|--------|-----|
-| **SSH** | `ssh orange` lub `ssh orange-ssh.bodino.us.kg` |
-| **Zigbee2MQTT** | https://zigbee.bodino.us.kg |
-| **Homebridge** | https://homebridge.bodino.us.kg |
-| **Pi-hole** | https://pihole.bodino.us.kg |
-
-**Tailscale IP:** 100.73.24.70
-**Subnet routing:** 192.168.0.0/24 (cała sieć domowa)
-
-### Raspberry Pi (192.168.0.189)
-
-**Dane logowania:**
-- **user:** `bodino` / `Keram1qazXSW@`
-
-**Serwisy Cloudflare Tunnel:**
-| Serwis | URL |
-|--------|-----|
-| **SSH** | `ssh rb` lub `ssh rpi-ssh.bodino.us.kg` |
-| **n8n** | https://n8n.bodino.us.kg |
-
-**Tailscale IP:** 100.112.174.109
-**Tunel ID:** 278a7b8a-8f20-4854-95f9-75ef20c332a2
-
-### Mac Mini (192.168.0.106)
-
-**Dane logowania:**
-- **user:** `marekbodynek` / `Keram1qazXSW@3edcV`
-
-**Serwisy Cloudflare Tunnel:**
-| Serwis | URL |
-|--------|-----|
-| **SSH** | `ssh macmini` lub `ssh macmini-ssh.bodino.us.kg` |
-
-**Tailscale IP:** 100.103.147.52
-**Jellyfin:** http://100.103.147.52:8096 (przez Tailscale)
-**Tunel ID:** 877197db-185e-43e9-983b-0fd95bd422ba
-**Port forwarding:** UDP 41641 → 192.168.0.106:41641 (dla bezpośredniego połączenia Tailscale)
-
-### Tailscale VPN
-
-**Urządzenia w sieci Tailscale:**
-| Urządzenie | Tailscale IP | Status |
-|------------|--------------|--------|
-| Mac Mini | 100.103.147.52 | online |
-| Apple TV | 100.85.3.71 | online |
-| MacBook Pro | 100.111.215.83 | online |
-| Orange Pi | 100.90.85.113 | online |
-| Raspberry Pi | 100.112.174.109 | online |
-
-**Instalacja:**
-- macOS: App Store lub `brew install --cask tailscale`
-- Apple TV: App Store → Tailscale
-- Zaloguj się na to samo konto Tailscale
-
-**Przez Tailscale masz dostęp do:**
-- Mac Mini (100.103.147.52) - Jellyfin, dysk z filmami
-- Orange Pi (100.90.85.113) - Pi-hole, Homebridge, Zigbee2MQTT
-- Raspberry Pi (100.107.249.87) - n8n, dodatkowe serwisy
-
-**Panel administracyjny:** https://login.tailscale.com/admin
-
-### Streaming (Jellyfin + Infuse)
-
-**Architektura (Koszalin → Słowenia):**
-```
-Infuse (Słowenia) → Tailscale → Mac Mini (100.103.147.52) → Jellyfin (:8096)
+**Debian/Armbian:**
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
 ```
 
-**Konfiguracja w Infuse:**
-1. Zainstaluj **Tailscale** na Apple TV (App Store)
-2. Zaloguj się na to samo konto
-3. W **Infuse** dodaj źródło **Jellyfin**:
-   - Adres: `100.103.147.52` (Tailscale IP Mac Mini)
-   - Port: `8096`
-   - Użytkownik/hasło: dane do Jellyfin
+**Apple TV:**
+App Store → Tailscale
 
-**Alternatywnie (SMB):**
-- Adres: `100.103.147.52`
-- Ścieżka: `Seagate25_5T/!!!!Filmy NB`
-- Użytkownik/hasło: dane do MacMini
+### Port forwarding (router)
 
-### Healthcheck i monitoring
+```
+UDP 41641 → 192.168.0.106:41641 (Mac Mini - bezpośrednie połączenie)
+```
 
-**Orange Pi:** Skrypt `~/tunnel-healthcheck.sh` sprawdza tunele **co 5 minut** i automatycznie restartuje cloudflared jeśli nie działa.
+---
 
-**Logi:** `/var/log/tunnel-healthcheck.log`
+## Harmonogram backupów
+
+### Synology NAS DS224+ (centralne backupy)
+
+Wszystkie backupy zapisywane są na NAS1 w `/volume1/backups/`.
+
+| Urządzenie | Kiedy | Lokalizacja na NAS | Retencja |
+|------------|-------|-------------------|----------|
+| Raspberry Pi | Niedziela 3:00 | `/volume1/backups/rpi/` | 30 dni |
+| Orange Pi | Niedziela 3:00 | `/volume1/backups/opi/` | 30 dni |
+
+### Mac Mini
+
+Mac Mini używa **Time Machine** do backupów na NAS (`//192.168.0.164/timemachine`).
+
+---
+
+## Skrypty automatyzacji
+
+### check-tunnels.sh (Raspberry Pi)
+
+**Lokalizacja:** `/usr/local/bin/check-tunnels.sh`
+**Cron:** `*/5 * * * *`
+
+Sprawdza status tuneli Cloudflare na wszystkich urządzeniach i restartuje w razie awarii.
+
+### update-pihole.sh (Orange Pi / Raspberry Pi)
+
+**Lokalizacja:** `/usr/local/bin/update-pihole.sh`
+**Cron:** `0 */6 * * *`
+
+Aktualizuje listy blokujące Pi-hole (gravity).
+
+### weekly-update.sh (Orange Pi / Raspberry Pi)
+
+**Lokalizacja:** `/usr/local/bin/weekly-update.sh`
+**Cron:** `0 3 * * 0` (niedziela 3:00)
+
+1. Tworzy backup konfiguracji
+2. Aktualizuje pakiety systemowe
+3. Aktualizuje serwisy (Homebridge, Zigbee2MQTT, n8n, Pi-hole)
+4. Restartuje wszystkie serwisy
+
+---
+
+## Procedury przywracania
+
+### Przywracanie Orange Pi
+
+1. **Instalacja od zera:**
+   - Flash Armbian Bookworm na kartę SD
+   - Ustaw IP statyczne: 192.168.0.133
+   - Zainstaluj serwisy w kolejności:
+     1. Pi-hole + Unbound
+     2. Cloudflared
+     3. Tailscale
+
+2. **Przywróć konfiguracje z backupu (NAS1):**
+   ```bash
+   # Zamontuj NAS1
+   mount -t cifs //192.168.0.164/backups /mnt/backups -o user=Bodino
+   tar -xzf /mnt/backups/opi/backup-YYYY-MM-DD.tar.gz -C /
+   ```
+
+### Przywracanie Raspberry Pi
+
+1. **Instalacja od zera:**
+   - Flash Raspberry Pi OS (Lite 64-bit)
+   - Ustaw IP statyczne: 192.168.0.188
+   - User: bodino, hasło: Keram1qazXSW@
+   - Zainstaluj serwisy:
+     1. Pi-hole + Unbound
+     2. Node.js 22 + n8n
+     3. Homebridge
+     4. Zigbee2MQTT + Mosquitto
+     5. Docker + Home Assistant
+     6. Cloudflared
+     7. Tailscale
+
+2. **Przywróć konfiguracje z backupu (NAS1):**
+   ```bash
+   # Zamontuj NAS1
+   mount -t cifs //192.168.0.164/backups /mnt/backups -o user=Bodino
+   tar -xzf /mnt/backups/rpi/backup-YYYY-MM-DD.tar.gz -C /
+   ```
+
+### Przywracanie Cloudflare Tunnel
+
+1. **Zaloguj do Cloudflare:**
+   ```bash
+   cloudflared tunnel login
+   ```
+
+2. **Użyj istniejącego tunelu:**
+   ```bash
+   # Skopiuj credentials file z backupu do ~/.cloudflared/
+   # Skopiuj config.yml do /etc/cloudflared/
+
+   sudo systemctl enable cloudflared
+   sudo systemctl start cloudflared
+   ```
+
+3. **Lub utwórz nowy tunel:**
+   ```bash
+   cloudflared tunnel create <nazwa>
+   # Zaktualizuj DNS w Cloudflare dashboard
+   ```
+
+---
 
 ## Bezpieczeństwo
 
-### Fail2ban
-- Blokuje IP po **3 nieudanych logowaniach SSH** na **24 godziny**
-- Status: `sudo fail2ban-client status sshd`
-- Odblokowanie IP: `sudo fail2ban-client set sshd unbanip <IP>`
+### Fail2ban (Orange Pi + Raspberry Pi)
 
-### SSH Hardening
-- Root login wyłączony
-- Max 3 próby logowania
-- Timeout 30 sekund
+**Config:** `/etc/fail2ban/jail.local`
 
-### Automatyczne aktualizacje bezpieczeństwa
-- Codzienne sprawdzanie aktualizacji
-- Automatyczna instalacja poprawek bezpieczeństwa
-- Bez automatycznego restartu
+```ini
+[DEFAULT]
+bantime = 1h
+findtime = 10m
+maxretry = 5
+ignoreip = 127.0.0.1/8 192.168.0.0/24 100.64.0.0/10
 
-### Cloudflare Tunnel
-- Brak otwartych portów z internetu
-- Cały ruch przez szyfrowany tunel
-- Healthcheck co 5 minut
+[sshd]
+enabled = true
+maxretry = 3
+bantime = 24h
+```
+
+**Komendy:**
+```bash
+fail2ban-client status sshd     # Status jail SSH
+fail2ban-client unban <IP>      # Odblokuj IP
+```
+
+### CrowdSec (Raspberry Pi)
+
+Kolaboracyjny IDS/IPS z firewall bouncer.
+
+**Komendy:**
+```bash
+sudo cscli metrics              # Metryki
+sudo cscli decisions list       # Lista zablokowanych IP
+sudo cscli bouncers list        # Status bouncerów
+```
+
+**Instalowane scenariusze:**
+- ssh-bf (brute-force SSH)
+- ssh-slow-bf (wolny brute-force)
+- ssh-cve-2024-6387 (wykrywanie exploita)
+
+### Automatyczne aktualizacje bezpieczeństwa (unattended-upgrades)
+
+Zainstalowane na obu urządzeniach. Automatycznie instaluje tylko krytyczne aktualizacje bezpieczeństwa.
+
+**Config:** `/etc/apt/apt.conf.d/50unattended-upgrades`
+
+- Tylko pakiety z etykietą `Debian-Security`
+- Timer: codziennie ~6:00 (nie koliduje z tygodniowymi aktualizacjami o 3:00)
+- Nie wymaga restartu (kernel updates wymagają ręcznego restartu)
+
+**Komendy:**
+```bash
+unattended-upgrades --dry-run     # Symulacja
+cat /var/log/unattended-upgrades/unattended-upgrades.log  # Logi
+```
+
+### Logwatch (monitoring logów)
+
+Zainstalowane na obu urządzeniach. Generuje codzienne raporty z logów systemowych.
+
+**Config:** `/etc/logwatch/conf/logwatch.conf`
+**Raporty:** `/var/log/logwatch/logwatch.log`
+
+- Timer: codziennie (cron.daily)
+- Detail: Medium
+- Zakres: wczorajsze logi
+
+**Komendy:**
+```bash
+logwatch --output stdout --range today --detail Med   # Ręczny raport
+cat /var/log/logwatch/logwatch.log                    # Ostatni raport
+```
+
+### Pi-hole - Listy bezpieczeństwa
+
+Dodatkowe listy blokujące malware i phishing:
+
+| Lista | Opis |
+|-------|------|
+| URLhaus | Malware URLs |
+| Phishing Filter | Strony phishingowe |
+| Anti-Malware | Złośliwe domeny |
+| Risk Hosts | Ryzykowne hosty |
+| Spam404 | Spam i scam |
+| Prigent-Crypto | Koparki kryptowalut |
+| The Great Wall | Chińskie złośliwe domeny |
+
+**Statystyki blokowania:**
+- Orange Pi: ~2,022,200 domen
+- Raspberry Pi: ~2,071,191 domen
+
+---
+
+## Historia zmian
+
+### 2025-12-22
+- **Cloudflare Tunnel dla Synology NAS**
+  - Zainstalowano cloudflared na NAS
+  - Tunnel ID: 268f4074-6efc-4cfb-acd8-ae7be8041a0b
+  - Dostęp do DSM: https://nas.bodino.us.kg
+  - SSH przez Cloudflare: nas-ssh.bodino.us.kg
+- **SMB dla RPi SSD**
+  - Skonfigurowano Sambę na RPi
+  - Udział [ssd] udostępnia /home/bodino
+  - Dostęp: smb://192.168.0.188/ssd (user: bodino)
+- **RetroArch na RPi**
+  - Skonfigurowano profil DualSense PS5
+  - Naprawiono mapowanie kontrolera
+  - Ustawiono domyślny katalog na /mnt/roms
+- **Tailscale na Synology NAS**
+  - Zainstalowano Tailscale v1.92.3
+  - IP Tailscale: 100.106.39.80
+  - Hostname: bodinonas1
+
+### 2025-12-19
+- **Konfiguracja NAS Synology DS224+**
+  - 2x 18TB RAID 1 (Btrfs), 18GB RAM
+  - Utworzono foldery współdzielone: media, backups, roms, timemachine
+  - Skonfigurowano SSH (user: Bodino)
+- **Migracja systemu RPi na NVMe SSD**
+  - Samsung 990 EVO Plus 2TB
+  - Boot order: NVMe → SD → USB
+  - System przeniesiony z karty SD (~20GB)
+- **Zmiana źródła ROMs dla RetroArch**
+  - Z Mac Mini (192.168.0.106) na NAS (192.168.0.164)
+  - Nowy plik credentials: /etc/smb-credentials-nas
+  - Dodany nas-route.service (fix dla Tailscale subnet routing)
+- **Docker Watchdog na RPi**
+  - Monitoring Home Assistant co 15 minut
+  - Sprawdza: Docker daemon, kontener HA, HTTP health
+  - Logi: /var/log/docker-watchdog.log
+- **Usunięto Docker z Mac Mini**
+  - Wszystkie kontenery i obrazy usunięte
+  - Mac Mini teraz tylko: Jellyfin + Time Machine
+
+### 2025-12-14
+- **Migracja Home Assistant z Mac Mini na Raspberry Pi**
+  - Zainstalowano Docker na RPi
+  - Przeniesiono konfigurację HA (~926MB) z Mac Mini
+  - HA uruchomiony w kontenerze Docker na RPi (port 8123)
+  - Zaktualizowano DNS route ha.bodino.us.kg → tunel RPi
+  - Usunięto zbędne kontenery z Mac Mini (n8n, cloudflared, n8n-mcp)
+- Mac Mini teraz tylko: Jellyfin + Backupy (HA zatrzymany, nie usunięty)
+
+### 2025-12-13
+- **Migracja smart home z Orange Pi na Raspberry Pi**
+  - Przeniesiono: Homebridge, Zigbee2MQTT, Mosquitto
+  - Zaktualizowano Cloudflare Tunnel routes
+  - Zaktualizowano skrypty weekly-update.sh na obu urządzeniach
+- Orange Pi teraz pełni rolę backup DNS (tylko Pi-hole + Unbound)
+- **Naprawiono problem z routingiem Tailscale na RPi**
+  - Tailscale przejmował routing dla adresów lokalnych (192.168.0.x)
+  - Rozwiązanie: `ip rule add from 192.168.0.188 lookup main priority 5200`
+  - Zmiana trwała w `/etc/crontab` (@reboot)
+- Zaktualizowano IP Raspberry Pi: 192.168.0.188 (Ethernet, nie WiFi)
+
+### 2025-12-12
+- Instalacja RetroArch + emulatorów na Raspberry Pi
+- Konfiguracja SMB mount dla ROMów z Mac Mini
+- Zainstalowane: RetroArch, Duckstation, Dolphin, MAME, Mednafen, VICE, FS-UAE, Hatari, Stella, Fuse, DOSBox, Osmose, PCSXR
+
+### 2025-12-11
+- Pełne przywracanie Raspberry Pi po awarii karty SD
+- Konfiguracja codziennych backupów konfiguracji serwisów
+- Konfiguracja tygodniowych backupów obrazów systemów (dd)
+- Wdrożenie Fail2ban na obu urządzeniach
+- Wdrożenie CrowdSec na Raspberry Pi
+- Dodanie list bezpieczeństwa do Pi-hole (malware, phishing, crypto miners)
+- Wdrożenie unattended-upgrades (automatyczne aktualizacje bezpieczeństwa)
+- Wdrożenie Logwatch (monitoring logów)
+- Aktualizacja dokumentacji
+
+### 2025-12-09
+- Tailscale bezpośrednio na Mac Mini
+- Instalacja Jellyfin na Mac Mini
+- Streaming przez Tailscale + Jellyfin
+
+### 2025-12-05
+- Pełna reinstalacja Orange Pi po awarii karty SD
+- Upgrade do Debian 13 (Trixie)
+
+---
 
 ## Notatki
 
-- System zaktualizowany 2025-11-25
-- Wszystkie serwisy działają poprawnie
-- Frontend Zigbee2MQTT bez zabezpieczenia hasłem (próba dodania auth zakończyła się błędem YAML)
+- **Kolejność łączenia SSH**:
+  - **W sieci Bodino_LTE_2.4** (192.168.0.x) → najpierw **lokalnie**: `ssh bodino@192.168.0.188`
+  - **Poza siecią domową** → kolejność:
+    1. **Cloudflare Tunnel**: `ssh -o ProxyCommand="cloudflared access ssh --hostname %h" bodino@rpi-ssh.bodino.us.kg`
+    2. **Tailscale**: `ssh bodino@100.112.174.109`
 - **HomeKit jest głównym źródłem kontroli temperatury** - harmonogramy Zigbee wyłączone
-- **Pi-hole blokuje 789,404 domen** - Firebog + polskie listy, aktualizowane co 6h
+- **Pi-hole blokuje ~2M domen** - Firebog + polskie listy, aktualizowane co 6h
+- **Frontend Zigbee2MQTT** bez zabezpieczenia hasłem (próba dodania auth zakończyła się błędem YAML)
+- **Backupy n8n** mogą być duże (~1 GB) - przechowywane tylko na Mac Mini
