@@ -1,6 +1,6 @@
 # Homebridge Backup - Dokumentacja Infrastruktury
 
-**Ostatnia aktualizacja:** 2026-01-27
+**Ostatnia aktualizacja:** 2026-01-28
 
 ## Spis treści
 - [Architektura systemu](#architektura-systemu)
@@ -638,6 +638,79 @@ ingress:
 
 ---
 
+## MacBook Pro
+
+### Dane dostępowe
+
+| Parametr | Wartość |
+|----------|---------|
+| **Model** | MacBook Pro 18,3 (M1 Pro) |
+| **User** | marekbodynek |
+| **Hasło** | bodino44 |
+| **IP Tailscale** | 100.111.215.83 |
+
+### VPN Menu (SwiftBar)
+
+Menu w pasku systemowym do zarządzania połączeniami VPN.
+
+**Uruchomienie:** `open -a SwiftBar`
+
+| VPN | Opis | Połączenie | Rozłączenie |
+|-----|------|------------|-------------|
+| **KEA** | OpenVPN do sieci firmowej KEA | `openvpn --config ~/.openvpn/KEAMarekB.ovpn` | kill openvpn |
+| **DOM** | Tailscale do sieci domowej | `tailscale up` | `tailscale down` |
+| **STU** | Checkpoint VPN (Studenac) | AppleScript (keystroke hasło) + Chrome | `trac disconnect` |
+| **NORD** | NordVPN Poland | AppleScript (auto-connect Poland) | AppleScript |
+
+**Ikona w pasku:**
+- `VPN` (biały) - wszystkie rozłączone
+- `VPN: KEA DOM` (zielony) - pokazuje aktywne VPN-y
+
+**Pliki konfiguracyjne:**
+- Plugin: `~/Library/Application Support/SwiftBar/Plugins/vpn-all.30s.sh`
+- OpenVPN config: `~/.openvpn/KEAMarekB.ovpn`
+- Skrypty VPN:
+  - `~/scripts/vpn-kea-start.sh` / `vpn-kea-stop.sh`
+  - `~/scripts/vpn-stu-connect.applescript` / `vpn-stu-disconnect.sh`
+  - `~/scripts/vpn-nord-connect.sh` / `vpn-nord-disconnect.sh`
+
+**STU VPN (Checkpoint) - szczegóły:**
+- Połączenie: Zamyka i otwiera aplikację, wpisuje hasło przez keystroke, czeka na połączenie (max 60s), otwiera Chrome z URL Qlik Sense i loguje
+- Rozłączenie: `trac disconnect` + `killall "Endpoint Security VPN"`
+- Hasło: `Keram6yhnMJU&`
+- User: `marek.bodynek`
+
+**Aliasy terminala:**
+```bash
+vpn-on   # Połącz KEA
+vpn-off  # Rozłącz KEA
+vpn      # Status KEA
+```
+
+### USB Hub Sleep Guard
+
+Daemon blokujący usypianie gdy podłączony jest hub USB (zapobiega kernel panic po wybudzeniu).
+
+**Monitorowane huby:**
+
+| Hub | VID:PID | Lokalizacja |
+|-----|---------|-------------|
+| Ugreen CM512 | 1507:1574 | Praca |
+| Ugreen CM818 | 1507:1573 | Praca |
+| Ugreen CM512 (dom) | 1507:1552 | Dom |
+
+**Pliki:**
+- Daemon: `~/scripts/usb-hub-sleep-daemon.sh`
+- LaunchAgent: `~/Library/LaunchAgents/com.bodino.usb-hub-sleep-guard.plist`
+- Log: `~/scripts/usb-hub-sleep-guard.log`
+
+**Działanie:**
+- Sprawdza co 5 sekund czy hub jest podłączony (przez ioreg VID/PID)
+- Jeśli tak → uruchamia `caffeinate -s` (blokuje usypianie)
+- Jeśli nie → zatrzymuje caffeinate
+
+---
+
 ## Cloudflare Tunnels
 
 ### Podsumowanie tuneli
@@ -924,6 +997,17 @@ Dodatkowe listy blokujące malware i phishing:
 ---
 
 ## Historia zmian
+
+### 2026-01-28
+- **VPN Menu dla MacBook Pro**
+  - Zainstalowano SwiftBar (zamiennik xbar - stabilniejszy)
+  - Plugin: `vpn-all.30s.sh` - zarządzanie 4 VPN-ami
+  - KEA (OpenVPN), DOM (Tailscale), STU (Checkpoint), NORD (NordVPN)
+  - STU: pełna automatyzacja - łączy VPN, otwiera Chrome, loguje na Qlik Sense
+  - Detekcja statusu: pgrep (KEA), tailscale status (DOM), trac info (STU), defaults read (NORD)
+- **USB Hub Sleep Guard - trzeci hub**
+  - Dodano Ugreen CM512 (dom) - VID:1507, PID:1552
+  - Daemon monitoruje teraz 3 huby
 
 ### 2025-12-22
 - **Cloudflare Tunnel dla Synology NAS**
