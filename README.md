@@ -226,7 +226,7 @@ sudo /volume1/tailscale/tailscale --socket=/volume1/tailscale/tailscaled.sock st
 | Parametr | Wartość |
 |----------|---------|
 | **IP Ethernet (end0)** | 192.168.0.133 |
-| **IP WiFi (wlan0)** | 192.168.0.134 |
+| **IP WiFi (wlan0)** | 192.168.0.134 (backup) |
 | **WiFi SSID** | Bodino_LTE_2.4 |
 | **WiFi MAC** | 2c:2c:78:fb:20:3d |
 | **IP Tailscale** | 100.90.85.113 |
@@ -1204,6 +1204,7 @@ Dodatkowe listy blokujące malware i phishing:
   - **Poza siecią domową** → kolejność:
     1. **Cloudflare Tunnel**: `ssh -o ProxyCommand="cloudflared access ssh --hostname %h" bodino@rpi-ssh.bodino.us.kg`
     2. **Tailscale**: `ssh bodino@100.112.174.109`
+- **WiFi jako backup** - oba urządzenia (RPi + Orange Pi) mają aktywne WiFi (Bodino_LTE_2.4) jako backup dla Ethernet
 - **HomeKit jest głównym źródłem kontroli temperatury** - harmonogramy Zigbee wyłączone
 - **Pi-hole blokuje ~2M domen** - Firebog + polskie listy, aktualizowane co 6h
 - **Frontend Zigbee2MQTT** bez zabezpieczenia hasłem (próba dodania auth zakończyła się błędem YAML)
