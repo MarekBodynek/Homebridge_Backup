@@ -521,7 +521,7 @@ Serwer Microsoft 365 API dla ClawdBot (Microsoft Graph).
 
 **Funkcje:**
 - Mail (odczyt, wysyłanie)
-- Kalendarz (odczyt, tworzenie)
+- Kalendarz (odczyt, tworzenie, współdzielone kalendarze)
 - OneDrive (pliki)
 - Tasks (zadania)
 - Contacts (kontakty)
@@ -1084,7 +1084,8 @@ Dodatkowe listy blokujące malware i phishing:
   - Zintegrowano Microsoft 365 z ClawdBot
   - Azure App Registration: ClawdBot MS365
   - Konto: marek.bodynek@kea.si
-  - Funkcje: Mail, Calendar, OneDrive, Tasks, Contacts
+  - Funkcje: Mail, Calendar (+ współdzielone), OneDrive, Tasks, Contacts
+  - Uprawnienia: Calendars.Read.Shared, Calendars.ReadWrite.Shared
   - Serwis systemd user: ms365-mcp.service (port 3365)
   - Auto-refresh tokena co 45 min (cron)
 
