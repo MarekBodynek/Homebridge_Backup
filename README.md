@@ -1,6 +1,6 @@
 # Homebridge Backup - Dokumentacja Infrastruktury
 
-**Ostatnia aktualizacja:** 2026-01-28
+**Ostatnia aktualizacja:** 2026-01-29
 
 ## Spis treści
 - [Architektura systemu](#architektura-systemu)
@@ -331,6 +331,8 @@ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFbPQdvqjne28bG+vUOUZoUxRMTs2+r4mz5G4n7XQagX
 | Unbound | 5335 | Rekursywny DNS |
 | Home Assistant | 8123 | Docker kontener |
 | Docker Watchdog | - | Monitoring HA (co 15 min) |
+| ClawdBot Gateway | 3000 | AI assistant (Telegram/iMessage) |
+| MS365 MCP Server | 3365 | Microsoft 365 API |
 | Cloudflared | - | Cloudflare tunnel |
 | Tailscale | - | VPN mesh |
 
@@ -495,6 +497,54 @@ server:
     private-address: 10.0.0.0/8
 ```
 
+### ClawdBot Gateway
+
+AI assistant dostępny przez Telegram i iMessage.
+
+**Serwis:** `clawdbot-gateway.service` (systemd user)
+**Port:** 3000
+**Katalog:** `~/.clawdbot/`
+
+**Kanały:**
+- Telegram: @ClawdBot
+- iMessage: bodinoo@interia.pl (przez BlueBubbles na Mac Mini)
+
+**Konfiguracja:** `~/.clawdbot/config.yaml`
+
+### MS365 MCP Server
+
+Serwer Microsoft 365 API dla ClawdBot (Microsoft Graph).
+
+**Konto:** marek.bodynek@kea.si
+**Serwis:** `ms365-mcp.service` (systemd user)
+**Port:** 3365
+
+**Funkcje:**
+- Mail (odczyt, wysyłanie)
+- Kalendarz (odczyt, tworzenie)
+- OneDrive (pliki)
+- Tasks (zadania)
+- Contacts (kontakty)
+
+**Pliki:**
+- Token: `~/ms365-token.json`
+- Refresh script: `~/ms365-refresh-token.sh`
+- Serwis: `~/.config/systemd/user/ms365-mcp.service`
+
+**Azure App Registration:**
+- App ID: `ed4fe004-daae-4437-838a-c9d4ef07ec53`
+- Tenant ID: `ebdccd1d-ae7a-40d8-b3b4-9ed033b2b100`
+
+**Cron:** Token odświeżany co 45 min (`~/ms365-refresh-token.sh`)
+
+**Komendy:**
+```bash
+systemctl --user status ms365-mcp        # Status serwisu
+~/ms365-refresh-token.sh                  # Ręczne odświeżenie tokena
+curl -s -H "Authorization: Bearer $(jq -r .access_token ~/ms365-token.json)" \
+  "https://graph.microsoft.com/v1.0/me"  # Test API
+```
+
 ### Cron Jobs
 
 **Plik:** `/etc/cron.d/rpi-automation`
@@ -595,6 +645,7 @@ ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDbxXEHfLMii5ldtjfBeZsJ9I8L+OuVdowq7NqmFyJt
 | Serwis | Port | Opis |
 |--------|------|------|
 | Jellyfin | 8096 | Media server |
+| BlueBubbles | 1234 | iMessage bridge server |
 | Time Machine | - | Backup na NAS (//192.168.0.164/timemachine) |
 | Cloudflared | - | Cloudflare tunnel |
 
@@ -615,8 +666,28 @@ ingress:
     service: http://localhost:8096
   - hostname: macmini-ssh.bodino.us.kg
     service: ssh://localhost:22
+  - hostname: bluebubbles.bodino.us.kg
+    service: http://localhost:1234
   - service: http_status:404
 ```
+
+### BlueBubbles (iMessage Bridge)
+
+**URL:** `https://bluebubbles.bodino.us.kg`
+**Password:** `Keram1qazXSW@`
+**iMessage:** `bodinoo@interia.pl`
+**Port lokalny:** 1234
+
+**Funkcje:**
+- Wysyłanie/odbieranie iMessage przez API
+- Integracja z ClawdBot (Telegram → iMessage)
+- Auto-start jako LaunchAgent
+
+**Konfiguracja:**
+- App: `/Applications/BlueBubbles.app`
+- Full Disk Access: włączony
+- Accessibility: włączony
+- Private API: wyłączony (SIP aktywny)
 
 ### Cron Jobs
 
@@ -997,6 +1068,25 @@ Dodatkowe listy blokujące malware i phishing:
 ---
 
 ## Historia zmian
+
+### 2026-01-29
+- **BlueBubbles na Mac Mini**
+  - Zainstalowano BlueBubbles (iMessage bridge server)
+  - URL: https://bluebubbles.bodino.us.kg
+  - Cloudflare Tunnel: dodano routing bluebubbles.bodino.us.kg → localhost:1234
+  - Integracja z ClawdBot: plugin bluebubbles włączony
+  - iMessage: bodinoo@interia.pl
+- **ClawdBot - kanał BlueBubbles**
+  - Włączono plugin bluebubbles
+  - Konfiguracja: serverUrl + password
+  - Telegram + iMessage działają równolegle
+- **MS365 MCP Server na RPi**
+  - Zintegrowano Microsoft 365 z ClawdBot
+  - Azure App Registration: ClawdBot MS365
+  - Konto: marek.bodynek@kea.si
+  - Funkcje: Mail, Calendar, OneDrive, Tasks, Contacts
+  - Serwis systemd user: ms365-mcp.service (port 3365)
+  - Auto-refresh tokena co 45 min (cron)
 
 ### 2026-01-28
 - **VPN Menu dla MacBook Pro**
