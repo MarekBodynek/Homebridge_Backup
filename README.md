@@ -37,21 +37,27 @@
 │  TS: 100.112.174.109     │  │ TS: 100.90.85.113   │  ├────────────────────────┤
 │    (główny serwer)       │  │   (backup DNS)      │  │ • Jellyfin:8096        │
 ├──────────────────────────┤  ├─────────────────────┤  │ • Time Machine         │
-│ • Homebridge:8581        │  │ • Pi-hole:80        │  └────────────────────────┘
-│ • Zigbee2MQTT:8080       │  │ • Unbound:5335      │
-│ • Mosquitto:1883         │  │ • Tailscale subnet  │
-│ • n8n:5678               │  │   router 192.168.0/24│
-│ • Pi-hole:80             │  └─────────────────────┘
-│ • Unbound:5335           │
-│ • Home Assistant         │       ┌─────────────────────────┐
-│ • ClawdBot:3000          │       │    SYNOLOGY DS224+      │
-│ • MS365 MCP:3365         │       │    192.168.0.164        │
-│ • Docker Watchdog        │       │  TS: 100.106.39.80      │
-└─────────────┬────────────┘       ├─────────────────────────┤
-              │        SMB       │ • 2x18TB RAID1 (Btrfs)  │
-              ├──────────────────┤ • SMB: media, backups,  │
-              │                  │   roms, timemachine     │
-              │                  └─────────────────────────┘
+│ • Homebridge:8581        │  │ • Pi-hole:80        │  │                        │
+│ • Zigbee2MQTT:8080       │  │ • Unbound:5335      │  │                        │
+│ • Mosquitto:1883         │  │ • Tailscale subnet  │  │                        │
+│ • n8n:5678               │  │   router 192.168.0/24│  │                        │
+│ • Pi-hole:80             │  │                     │  │                        │
+│ • Unbound:5335           │  │                     │  │                        │
+│ • Home Assistant         │  │                     │  │                        │
+│ • ClawdBot:3000          │  │                     │  │                        │
+│ • MS365 MCP:3365         │  │                     │  │                        │
+│ • Docker Watchdog        │  │                     │  │                        │
+└─────────────┬────────────┘  └─────────────────────┘  └────────────────────────┘
+              │
+              │        SMB         ┌─────────────────────────┐
+              ├────────────────────│    SYNOLOGY DS224+      │
+              │                    │    192.168.0.164        │
+              │                    │  TS: 100.106.39.80      │
+              │                    ├─────────────────────────┤
+              │                    │ • 2x18TB RAID1 (Btrfs)  │
+              │                    │ • SMB: media, backups,  │
+              │                    │   roms, timemachine     │
+              │                    └─────────────────────────┘
               │
               │     ┌───────────────────────────┐
               │     │      Tailscale VPN        │
