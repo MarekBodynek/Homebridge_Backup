@@ -44,12 +44,12 @@
 │ • Pi-hole:80           │  └─────────────────────┘
 │ • Unbound:5335         │
 │ • Home Assistant       │       ┌─────────────────────────┐
-│ • Docker Watchdog      │       │    SYNOLOGY DS224+      │
-└───────────┬────────────┘       │    192.168.0.164        │
-            │                    │  TS: 100.106.39.80      │
-            │        SMB         ├─────────────────────────┤
-            ├────────────────────┤ • 2x18TB RAID1 (Btrfs)  │
-            │                    │ • SMB: media, backups,  │
+│ • ClawdBot:3000        │       │    SYNOLOGY DS224+      │
+│ • MS365 MCP:3365       │       │    192.168.0.164        │
+│ • Docker Watchdog      │       │  TS: 100.106.39.80      │
+└───────────┬────────────┘       ├─────────────────────────┤
+            │        SMB         │ • 2x18TB RAID1 (Btrfs)  │
+            ├────────────────────┤ • SMB: media, backups,  │
             │                    │   roms, timemachine     │
             │                    └─────────────────────────┘
             │
@@ -72,6 +72,8 @@ Urządzenia Zigbee → Zigbee2MQTT → Mosquitto → Homebridge → HomeKit
 Apple TV → Cloudflare (jellyfin.bodino.us.kg) → Mac Mini (Jellyfin streaming)
 Raspberry Pi ← SMB → NAS (ROMs, media, backups)
 Mac Mini ← Time Machine → NAS
+Telegram/iMessage → ClawdBot (RPi) → MS365 MCP → Microsoft Graph API
+ClawdBot → BlueBubbles (Mac Mini) → iMessage
 ```
 
 ---
