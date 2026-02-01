@@ -1,3 +1,8 @@
 .brv/
 credentials.md
 .vscode/
+
+# Local secrets (nie commitować!)
+*.local.md
+*-local.md
+docs/*-secrets.md
