@@ -40,6 +40,73 @@ To powodowało nieskończoną pętlę błędów - ClawdBot próbował się uruch
 
 ---
 
+### ClawdBot Memory Search - naprawa (2026-02-01)
+
+**Problem:** Memory search nie działał - zwracał puste wyniki, embedding indeksowanie failowało z błędem "Input is longer than the context size"
+
+**Diagnoza:**
+- Model embeddings `gte-large_fp32.gguf` miał za mały context size (~128 tokenów)
+- Nawet pliki podzielone na 200-liniowe fragmenty były za duże
+- Błąd występował przy każdej próbie indeksowania
+
+**Rozwiązanie:**
+1. ✅ Pobrано nowy model embeddings: `nomic-embed-text-v1.5.f16.gguf`
+   - Context size: **8192 tokenów** (64x większy!)
+   - Rozmiar: 262MB (vs 1.3GB stary model)
+   - Źródło: HuggingFace (nomic-ai/nomic-embed-text-v1.5-GGUF)
+2. ✅ Zaktualizowano konfigurację w `~/.clawdbot/clawdbot.json`
+3. ✅ Zaindeksowano wszystkie pliki memory: **9/9 plików, 33 chunki**
+4. ✅ Przetestowano wyszukiwanie - działa poprawnie z scoringiem
+5. ✅ Poinformowano Claudię (MEMORY.md + MEMORY-FIXED-URGENT.md)
+
+**Status:** ✅ W pełni działający - Memory search gotowy do użycia
+
+**Czas naprawy:** ~45 minut
+
+---
+
+### ClawdBot Memory - Smart Fallback System (2026-02-01 23:30)
+
+**Ewolucja modeli embeddings:**
+- v1: gte-large_fp32 (128 tokenów) → failował na małych plikach
+- v2: nomic-embed-text-v1.5 (8K tokenów) → działał dla aktualnych plików
+- v3: Qwen3-Embedding-8B (32K tokenów) → duży model dla przyszłości
+- **v4: Smart Fallback System** → nomic primary + auto-switch do Qwen3
+
+**Powód smart fallback:**
+- Qwen3 duży (7.5GB) i wolniejszy niż nomic (262MB)
+- Nomic wystarczy dla 99% przypadków (do ~2000 linii)
+- Automatyczne przełączanie tylko gdy potrzeba
+
+**Implementacja:**
+1. ✅ Skrypt `~/memory-smart-index.sh` (RPi):
+   - Pre-check rozmiaru wszystkich plików memory
+   - <2000 linii → nomic (szybki, lekki)
+   - >2000 linii → automatyczne przełączenie na Qwen3
+   - Restart ClawdBot Gateway i ponowne indeksowanie
+2. ✅ Oba modele zainstalowane i gotowe:
+   - Primary: nomic-embed-text-v1.5.f16.gguf (262MB)
+   - Fallback: Qwen3-Embedding-8B-Q8_0.gguf (7.5GB)
+3. ✅ Przywrócono nomic jako primary model
+4. ✅ Zaktualizowano dokumentację (credentials.md, MEMORY.md)
+
+**Status aktualny:**
+- Model: nomic-embed-text-v1.5.f16.gguf
+- Indexed: 9/9 plików · 65 chunks
+- Vector search: ready
+- Smart fallback: gotowy do użycia
+
+**Workflow:**
+```bash
+# Zamiast: clawdbot memory index
+# Użyj:
+~/memory-smart-index.sh
+```
+
+**Status:** ✅ System wdrożony i działający
+
+---
+
 ### MacBook Pro - naprawa wydajności (2025-01-24)
 
 **Diagnoza:**
@@ -185,6 +252,24 @@ ssh bodino@192.168.0.188
 - ✅ Autocompact włączony (hook PreCompact)
 - ✅ Projekt homebridge-backup zainicjalizowany
 - ✅ `.brv/` dodany do `.gitignore`
+
+**MS365 Graph API - integracja:**
+- ✅ Dodano uprawnienie Mail.ReadWrite.Shared w Azure AD
+- ✅ Admin consent udzielony
+- ✅ Token odświeżony z nowymi uprawnieniami
+- ✅ Utworzono kompletny przewodnik: `docs/ms365-graph-api-setup.md`
+- ⚠️ Dostęp do shared mailboxów wymaga delegacji (vzdrzevanje@kea.si)
+
+**ClawdBot - zmiana profilu na prywatny (2026-02-01):**
+- ✅ Przywrócono profil `anthropic:claudia` w clawdbot.json
+- ✅ Przywrócono profil w auth-profiles.json z tokenem OAuth
+- ✅ Ustawiono lastGood.anthropic na "anthropic:claudia"
+- ✅ ClawdBot Gateway zrestartowany - używa profilu prywatnego
+- ✅ Model pozostaje Sonnet (anthropic/claude-sonnet-4-5)
+- ✅ **Fix (2026-02-01 22:19):** Naprawiono crash loop (491 restartów)
+  - Przyczyna: nierozpoznane klucze w `memorySearch.chunking`
+  - Rozwiązanie: `clawdbot doctor --fix`
+  - Status: Gateway działa stabilnie
 
 ---
 

@@ -164,7 +164,17 @@ journalctl --user -u clawdbot-gateway -f
 
 # Restart
 systemctl --user restart clawdbot-gateway
+
+# Memory search - indeksowanie (smart fallback)
+~/memory-smart-index.sh
+clawdbot memory status
 ```
+
+**Memory Search:**
+- Primary model: nomic-embed-text-v1.5 (262MB, 8K tokens)
+- Fallback model: Qwen3-8B (7.5GB, 32K tokens)
+- Smart switching: automatyczny wybór na podstawie rozmiaru plików
+- Skrypt: `~/memory-smart-index.sh` - auto-switch gdy pliki >2000 linii
 
 ### MS365 MCP (RPi)
 
@@ -205,6 +215,23 @@ curl -s -H "Authorization: Bearer $(jq -r .access_token ~/ms365-token.json)" \
 - Unbound: `/etc/unbound/unbound.conf.d/pi-hole.conf`
 
 > **Szczegóły konfiguracji:** Wyeksportowane do ByteRover
+
+---
+
+## Integracje
+
+### Microsoft Graph API (MS365)
+
+- **Dokumentacja:** [docs/ms365-graph-api-setup.md](docs/ms365-graph-api-setup.md)
+- **Użycie:** ClawdBot (Claudia) ma dostęp do maili, kalendarza i plików przez Graph API
+- **Konto:** marek.bodynek@kea.si
+- **Uprawnienia:** Mail, Calendar, Files (Delegated permissions)
+
+Przewodnik zawiera:
+- Konfigurację Azure AD App Registration
+- Generowanie i odświeżanie tokenów OAuth
+- Przykłady użycia API
+- Instrukcje dla innych projektów Claude Code
 
 ---
 
@@ -277,7 +304,7 @@ tar -xzf /mnt/backups/opi/backup-YYYY-MM-DD.tar.gz -C /
 
 ## Historia zmian
 
-- **2026-02-01**: ByteRover (auto-init) + MS365 Recovery + Model Sonnet
+- **2026-02-01**: ClawdBot Memory Smart Fallback + ByteRover + MS365 Recovery + Model Sonnet
 - **2026-01-29**: BlueBubbles + MS365 MCP + ClawdBot integracja
 - **2025-12-19**: NAS DS224+ + Migracja RPi na NVMe SSD
 - **2025-12-14**: Migracja Home Assistant z Mac Mini na RPi
