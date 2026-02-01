@@ -6,6 +6,40 @@
 
 ## Aktywne zadania
 
+### ClawdBot Gateway - diagnoza i naprawa (2025-01-29)
+
+**Problem:** ClawdBot przestał działać na Raspberry Pi
+
+**Plan diagnozy i naprawy:**
+- [x] 1. Połączyć się SSH z RPi (192.168.0.188)
+- [x] 2. Sprawdzić status usługi ClawdBot Gateway
+- [x] 3. Przeczytać logi systemd (ostatnie 50 wpisów)
+- [x] 4. Zweryfikować port 18789 (czy nasłuchuje)
+- [x] 5. Zidentyfikować przyczynę błędu
+- [x] 6. Naprawić problem
+- [x] 7. Zrestartować usługę
+- [x] 8. Zweryfikować, że działa poprawnie
+
+**Przyczyna błędu:**
+ClawdBot Gateway nie mógł się uruchomić, ponieważ w pliku usługi systemd brakło zmiennych środowiskowych:
+- `ELEVENLABS_API_KEY` - API key dla text-to-speech
+- `TELEGRAM_BOT_TOKEN` - token bota Telegram
+- `BLUEBUBBLES_PASSWORD` - hasło do BlueBubbles
+- `CLAWDBOT_GATEWAY_TOKEN` - był ustawiony na `undefined`
+
+To powodowało nieskończoną pętlę błędów - ClawdBot próbował się uruchomić, padał z błędem o brakującej zmiennej, systemd restartował go co 5 sekund, generując setki tysięcy logów (14-17 tys. na minutę!). Systemd-journald stłumił ponad 500,000 wiadomości.
+
+**Rozwiązanie:**
+1. Znaleziono plik `~/.secrets/api-keys.env` zawierający wszystkie potrzebne tokeny
+2. Dodano sourcowanie pliku do `~/.bashrc`
+3. Ręcznie zaktualizowano plik `~/.config/systemd/user/clawdbot-gateway.service`, dodając wszystkie zmienne Environment
+4. Przeładowano konfigurację systemd i uruchomiono usługę
+5. Zweryfikowano poprawne działanie - usługa działa na porcie 18789
+
+**Status:** ✅ Naprawiono - ClawdBot Gateway działa poprawnie
+
+---
+
 ### MacBook Pro - naprawa wydajności (2025-01-24)
 
 **Diagnoza:**
@@ -125,6 +159,34 @@ ssh bodino@192.168.0.188
 - update-pihole.sh (co 6h)
 - weekly-update.sh (niedziela 3:00)
 - logrotate
+
+### 2026-02-01: ClawdBot & MS365 Recovery
+
+**Zmienne model na Sonnet:**
+- ✅ ClawdBot primary model: `anthropic/claude-sonnet-4-5`
+- ✅ Claude Code settings: `model: "sonnet"`
+- ✅ ClawdBot Gateway zrestartowany i działa
+
+**MS365 MCP Server - Recovery:**
+- ✅ Znaleziono wszystkie pliki konfiguracji na RPi
+- ✅ Service ms365-mcp.service aktywny na porcie 3365
+- ✅ Token refresh script działa (auto co 45 min)
+- ✅ Daemon reload wykonany
+- ✅ Pliki znajdują się w:
+  - `~/.config/systemd/user/ms365-mcp.service`
+  - `~/ms365-refresh-token.sh`
+  - `~/ms365-token.json`
+  - `~/.clawdbot/ms365-cli.py`
+
+**ByteRover - automatyczna kuracja kontekstu:**
+- ✅ Skonfigurowany globalnie dla wszystkich projektów
+- ✅ Auto-init w hook `export-to-byterover.sh`
+- ✅ Team: Marek_team, Space: Marek_Space
+- ✅ Autocompact włączony (hook PreCompact)
+- ✅ Projekt homebridge-backup zainicjalizowany
+- ✅ `.brv/` dodany do `.gitignore`
+
+---
 
 ### 2025-12-05: Reinstalacja Orange Pi
 - Przywracanie po awarii karty SD
