@@ -6,6 +6,77 @@
 
 ## Aktywne zadania
 
+### ClawdBot Gateway - diagnoza problemu (2026-02-02)
+
+**Problem:** ClawdBot (Claudia) nie działa
+
+**Plan diagnozy:**
+- [x] Połączyć się SSH z RPi (192.168.0.188)
+- [x] Sprawdzić status usługi clawdbot-gateway
+- [x] Sprawdzić logi systemd
+- [x] Zidentyfikować problem
+- [x] Naprawić
+
+**Wyniki diagnozy:**
+- ✅ Serwis clawdbot-gateway: **DZIAŁA** (active since 03:00:15, 9h uptime)
+- ✅ Porty nasłuchują:
+  - 18789: clawdbot-gateway (localhost)
+  - 3001: clawd-api-server (wszystkie interfejsy)
+- ✅ Procesy ClawdBot działają prawidłowo
+- ✅ Telegram włączony (bot token: 7744778976:AAE...)
+- ✅ BlueBubbles włączony (https://bluebubbles.bodino.us.kg)
+- ✅ Telegram bot API: token działa poprawnie
+- ✅ ID użytkownika (1030820489) na liście dozwolonych
+
+**Problem:** Telegram - bot nie odpowiada na wiadomości
+
+**Rozwiązanie:**
+- ✅ Wykonano restart ClawdBot Gateway (12:15:11)
+
+**Status:** ✅ **NAPRAWIONO** - Claudia odpowiada na Telegramie
+
+---
+
+### Tunel claudia.bodino.us.kg - naprawa i monitoring (2026-02-02)
+
+**Problem:** https://claudia.bodino.us.kg/api/documents zwracał błąd 502 Bad Gateway
+
+**Diagnoza:**
+- Tunel Cloudflare działał poprawnie (claudia.bodino.us.kg → localhost:3001)
+- Serwer `clawd-api-server.js` nie działał - port 3001 nie nasłuchiwał
+- Serwer zatrzymał się po restarcie ClawdBot Gateway
+
+**Rozwiązanie:**
+1. ✅ Uruchomiono clawd-api-server: `cd /home/bodino && nohup node clawd-api-server.js > /tmp/clawd-api.log 2>&1 &`
+2. ✅ Dodano monitoring do `/usr/local/bin/check-tunnels.sh`:
+   - Sprawdza URL https://claudia.bodino.us.kg/api/documents
+   - Automatycznie restartuje clawd-api-server gdy nie odpowiada
+3. ✅ Przetestowano skrypt - działa poprawnie
+
+**Status:** ✅ **NAPRAWIONO** + dodano do automatycznego monitorowania (cron co 5 min)
+
+---
+
+## Review - ClawdBot Gateway (2026-02-02)
+
+**Problem:** Claudia nie odpowiadała na wiadomości Telegram
+
+**Diagnoza:**
+- Serwis działał prawidłowo (active, 9h uptime)
+- Token Telegram ważny, API odpowiadało
+- Użytkownik na liście dozwolonych
+- Porty nasłuchiwały poprawnie
+
+**Rozwiązanie:**
+Restart ClawdBot Gateway - problem z sesją lub połączeniem Telegram
+
+**Czas naprawy:** ~15 minut
+
+**Wnioski:**
+Jeśli Claudia przestaje odpowiadać na Telegramie, najpierw sprawdzić status serwisu, a następnie wykonać restart. Problem prawdopodobnie związany z utratą połączenia z Telegram API podczas długiego działania serwisu
+
+---
+
 ### ClawdBot Gateway - diagnoza i naprawa (2025-01-29)
 
 **Problem:** ClawdBot przestał działać na Raspberry Pi
